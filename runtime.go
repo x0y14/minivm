@@ -34,6 +34,11 @@ func NewRuntime(program []Code, config *Config) *Runtime {
 			R1: nil,
 			R2: nil,
 			R3: nil,
+			RA: nil,
+			RB: nil,
+			RC: nil,
+			RD: nil,
+			RE: nil,
 		},
 		flags: map[FlagRegister]bool{
 			ZF: false,
