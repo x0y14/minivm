@@ -1,4 +1,4 @@
-package minivm
+package vm
 
 type Opcode int
 
