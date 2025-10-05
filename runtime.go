@@ -26,7 +26,7 @@ func NewRuntime(program []Code, config *Config) *Runtime {
 		specials: map[SpecialRegister]int{
 			PC: 0,
 			BP: 0,
-			SP: config.StackSize - 1,
+			SP: config.StackSize,
 			HP: 0,
 		},
 		generals: map[GeneralPurposeRegister]Immediate{
@@ -488,7 +488,9 @@ func (r *Runtime) exec() error {
 				if !calculable(v, srcValue) {
 					return fmt.Errorf("add: unsupported values: %T += %T", v, srcValue)
 				}
-				return r.setReg(dst.(Register), Integer(v.Value()+srcValue.Value()))
+				res := Integer(v.Value() + srcValue.Value())
+				r.setFlagReg(ZF, res.Value() == 0)
+				return r.setReg(dst.(Register), res)
 			case Offset:
 				v, err := r.getStack(dst.(Offset))
 				if err != nil {
@@ -497,7 +499,9 @@ func (r *Runtime) exec() error {
 				if !calculable(v, srcValue) {
 					return fmt.Errorf("add: unsupported values: %T += %T", v, srcValue)
 				}
-				return r.setStack(dst.(Offset), Integer(v.Value()+srcValue.Value()))
+				res := Integer(v.Value() + srcValue.Value())
+				r.setFlagReg(ZF, res.Value() == 0)
+				return r.setStack(dst.(Offset), res)
 			default:
 				return fmt.Errorf("add: unsupported dst: %s", dst.String())
 			}
@@ -535,7 +539,9 @@ func (r *Runtime) exec() error {
 				if !calculable(v, srcValue) {
 					return fmt.Errorf("sub: unsupported values: %T -= %T", v, srcValue)
 				}
-				return r.setReg(dst.(Register), Integer(v.Value()-srcValue.Value()))
+				res := Integer(v.Value() - srcValue.Value())
+				r.setFlagReg(ZF, res.Value() == 0)
+				return r.setReg(dst.(Register), res)
 			case Offset:
 				v, err := r.getStack(dst.(Offset))
 				if err != nil {
@@ -544,7 +550,9 @@ func (r *Runtime) exec() error {
 				if !calculable(v, srcValue) {
 					return fmt.Errorf("sub: unsupported values: %T -= %T", v, srcValue)
 				}
-				return r.setStack(dst.(Offset), Integer(v.Value()-srcValue.Value()))
+				res := Integer(v.Value() - srcValue.Value())
+				r.setFlagReg(ZF, res.Value() == 0)
+				return r.setStack(dst.(Offset), res)
 			default:
 				return fmt.Errorf("sub: unsupported dst: %s", dst.String())
 			}
