@@ -37,3 +37,15 @@ func (b Boolean) Value() int {
 	}
 	return 0
 }
+
+type Character rune
+
+func (c Character) isCode() {}
+func (c Character) String() string {
+	return strconv.QuoteRune(rune(c))
+}
+func (c Character) isOperand()   {}
+func (c Character) isImmediate() {}
+func (c Character) Value() int {
+	return int(c)
+}

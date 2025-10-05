@@ -1,6 +1,10 @@
 package minivm
 
-import "fmt"
+import (
+	"fmt"
+	"io"
+	"os"
+)
 
 type Config struct {
 	StackSize int
@@ -19,6 +23,10 @@ type Runtime struct {
 	stack     []Immediate
 	heap      []Immediate
 	halt      bool
+
+	stdin  io.Reader
+	stdout io.Writer
+	stderr io.Writer
 }
 
 func NewRuntime(program []Code, config *Config) *Runtime {
@@ -26,14 +34,21 @@ func NewRuntime(program []Code, config *Config) *Runtime {
 		specials: map[SpecialRegister]int{
 			PC: 0,
 			BP: 0,
-			SP: config.StackSize - 1,
+			SP: config.StackSize,
 			HP: 0,
 		},
 		generals: map[GeneralPurposeRegister]Immediate{
-			R0: nil,
-			R1: nil,
-			R2: nil,
-			R3: nil,
+			R0:  nil,
+			R1:  nil,
+			R2:  nil,
+			R3:  nil,
+			R4:  nil,
+			R5:  nil,
+			R6:  nil,
+			R7:  nil,
+			R8:  nil,
+			R9:  nil,
+			R10: nil,
 		},
 		flags: map[FlagRegister]bool{
 			ZF: false,
@@ -45,6 +60,10 @@ func NewRuntime(program []Code, config *Config) *Runtime {
 		stack:     make([]Immediate, config.StackSize),
 		heap:      make([]Immediate, config.HeapSize),
 		halt:      false,
+
+		stdin:  os.Stdin,
+		stdout: os.Stdout,
+		stderr: os.Stderr,
 	}
 }
 
@@ -177,6 +196,36 @@ func (r *Runtime) getHeap(heapAddr int) (Immediate, error) {
 		return nil, fmt.Errorf("getHeap: out of bounds")
 	}
 	return r.heap[heapAddr], nil
+}
+
+func (r *Runtime) readHeapBytes(addr, length int) ([]byte, error) {
+	if addr < 0 || length < 0 || addr+length > len(r.heap) {
+		return nil, fmt.Errorf("readHeapBytes: out of bounds")
+	}
+	buf := make([]byte, length)
+	for i := 0; i < length; i++ {
+		cell, err := r.getHeap(addr + i)
+		if err != nil {
+			return nil, err
+		}
+		if cell == nil {
+			buf[i] = 0
+			continue
+		}
+		buf[i] = byte(rune(cell.Value()))
+	}
+	return buf, nil
+}
+func (r *Runtime) writeHeapBytes(addr int, data []byte) error {
+	if addr < 0 || addr+len(data) > len(r.heap) {
+		return fmt.Errorf("writeHeapBytes: out of bounds")
+	}
+	for i, b := range data {
+		if err := r.setHeap(addr+i, Character(int(b))); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *Runtime) relocate(op Opcode) {
@@ -382,8 +431,8 @@ func (r *Runtime) exec() error {
 			if _, ok := dst.(PcOffset); !ok {
 				return fmt.Errorf("call: unsupported dst: %s", dst.String())
 			}
-			// `call dst`の`dst`位置から相対計算
-			base := int(r.getSpecialReg(PC)) + code.NumOperands()
+			// 現在のpcから計算
+			base := int(r.getSpecialReg(PC))
 			diff := int(dst.(PcOffset))
 			dstAddr := Integer(base + diff)
 
@@ -411,8 +460,8 @@ func (r *Runtime) exec() error {
 			if _, ok := dst.(PcOffset); !ok {
 				return fmt.Errorf("jmp: unsupported dst: %s", dst.String())
 			}
-			// `jmp dst`の`dst`の位置から相対計算
-			base := int(r.getSpecialReg(PC)) + code.NumOperands()
+			// 現在のpcから計算
+			base := int(r.getSpecialReg(PC))
 			diff := int(dst.(PcOffset))
 			dstAddr := Integer(base + diff)
 			r.setSpecialReg(PC, dstAddr)
@@ -422,8 +471,8 @@ func (r *Runtime) exec() error {
 			if _, ok := dst.(PcOffset); !ok {
 				return fmt.Errorf("je: unsupported dst: %s", dst.String())
 			}
-			// `je dst`の`dst`の位置から相対計算
-			base := int(r.getSpecialReg(PC)) + code.NumOperands()
+			// 現在のpcから計算
+			base := int(r.getSpecialReg(PC))
 			diff := int(dst.(PcOffset))
 			dstAddr := Integer(base + diff)
 			if r.getFlagReg(ZF) {
@@ -437,8 +486,8 @@ func (r *Runtime) exec() error {
 			if _, ok := dst.(PcOffset); !ok {
 				return fmt.Errorf("jne: unsupported dst: %s", dst.String())
 			}
-			// `jne dst`の`dst`の位置から相対計算
-			base := int(r.getSpecialReg(PC)) + code.NumOperands()
+			// 現在のpcから計算
+			base := int(r.getSpecialReg(PC))
 			diff := int(dst.(PcOffset))
 			dstAddr := Integer(base + diff)
 			if !r.getFlagReg(ZF) {
@@ -481,7 +530,9 @@ func (r *Runtime) exec() error {
 				if !calculable(v, srcValue) {
 					return fmt.Errorf("add: unsupported values: %T += %T", v, srcValue)
 				}
-				return r.setReg(dst.(Register), Integer(v.Value()+srcValue.Value()))
+				res := Integer(v.Value() + srcValue.Value())
+				r.setFlagReg(ZF, res.Value() == 0)
+				return r.setReg(dst.(Register), res)
 			case Offset:
 				v, err := r.getStack(dst.(Offset))
 				if err != nil {
@@ -490,7 +541,9 @@ func (r *Runtime) exec() error {
 				if !calculable(v, srcValue) {
 					return fmt.Errorf("add: unsupported values: %T += %T", v, srcValue)
 				}
-				return r.setStack(dst.(Offset), Integer(v.Value()+srcValue.Value()))
+				res := Integer(v.Value() + srcValue.Value())
+				r.setFlagReg(ZF, res.Value() == 0)
+				return r.setStack(dst.(Offset), res)
 			default:
 				return fmt.Errorf("add: unsupported dst: %s", dst.String())
 			}
@@ -528,7 +581,9 @@ func (r *Runtime) exec() error {
 				if !calculable(v, srcValue) {
 					return fmt.Errorf("sub: unsupported values: %T -= %T", v, srcValue)
 				}
-				return r.setReg(dst.(Register), Integer(v.Value()-srcValue.Value()))
+				res := Integer(v.Value() - srcValue.Value())
+				r.setFlagReg(ZF, res.Value() == 0)
+				return r.setReg(dst.(Register), res)
 			case Offset:
 				v, err := r.getStack(dst.(Offset))
 				if err != nil {
@@ -537,7 +592,9 @@ func (r *Runtime) exec() error {
 				if !calculable(v, srcValue) {
 					return fmt.Errorf("sub: unsupported values: %T -= %T", v, srcValue)
 				}
-				return r.setStack(dst.(Offset), Integer(v.Value()-srcValue.Value()))
+				res := Integer(v.Value() - srcValue.Value())
+				r.setFlagReg(ZF, res.Value() == 0)
+				return r.setStack(dst.(Offset), res)
 			default:
 				return fmt.Errorf("sub: unsupported dst: %s", dst.String())
 			}
@@ -747,16 +804,62 @@ func (r *Runtime) exec() error {
 			return nil
 		case SYSCALL:
 			defer func() { r.relocate(code) }()
-			syscallNo, err := r.getReg(R1)
+			no, err := r.getReg(R0)
 			if err != nil {
 				return err
 			}
-			switch syscallNo.Value() {
-			case 0:
+			switch no.Value() {
+			case SYS_EXIT:
 				r.halt = true
 				return nil
+			case SYS_WRITE:
+				fd := r.getGeneralReg(R1).Value()
+				addr := r.getGeneralReg(R2).Value()
+				length := r.getGeneralReg(R3).Value()
+				data, err := r.readHeapBytes(addr, length)
+				if err != nil {
+					return err
+				}
+
+				var w io.Writer
+				switch fd {
+				case 1:
+					w = r.stdout
+				case 2:
+					w = r.stderr
+				default:
+					return fmt.Errorf("sys_write: unsupported fd: %d", fd)
+				}
+				wrote, err := w.Write(data)
+				if err != nil {
+					return err
+				}
+				return r.setReg(R0, Integer(wrote))
+			case SYS_READ:
+				fd := r.getGeneralReg(R1).Value()
+				addr := r.getGeneralReg(R2).Value()
+				length := r.getGeneralReg(R3).Value()
+
+				var rd io.Reader
+				switch fd {
+				case 0:
+					rd = r.stdin
+				default:
+					return fmt.Errorf("sys_read: unsupported fd: %d", fd)
+				}
+				buf := make([]byte, length)
+				got, err := rd.Read(buf)
+				if err != nil {
+					return err
+				}
+				if got > 0 {
+					if err := r.writeHeapBytes(addr, buf[:got]); err != nil {
+						return err
+					}
+				}
+				return r.setReg(R0, Integer(got))
 			default:
-				return fmt.Errorf("syscall: unsupported syscallNo: %d", syscallNo.Value())
+				return fmt.Errorf("syscall: unsupported syscallNo: %d", no.Value())
 			}
 		default:
 			return fmt.Errorf("exec: unimplemented opcode: %s", code.String())
