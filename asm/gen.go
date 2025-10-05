@@ -7,17 +7,17 @@ import (
 )
 
 func convert(node Node) ([]vm.Code, error) {
-	switch node.(type) {
+	switch node := node.(type) {
 	case Instruction:
 		var result []vm.Code
 		// op
-		op, err := convert(node.(Instruction).Op)
+		op, err := convert(node.Op)
 		if err != nil {
 			return nil, err
 		}
 		result = append(result, op...)
 		// arguments
-		for _, arg := range node.(Instruction).Args {
+		for _, arg := range node.Args {
 			a, err := convert(arg)
 			if err != nil {
 				return nil, err
@@ -29,7 +29,7 @@ func convert(node Node) ([]vm.Code, error) {
 		op := []vm.Code{
 			NOP: vm.NOP,
 			MOV: vm.MOV,
-		}[node.(Operation)]
+		}[node]
 		return []vm.Code{op}, nil
 	case Register:
 		reg := []vm.Code{
@@ -37,10 +37,10 @@ func convert(node Node) ([]vm.Code, error) {
 			SP: vm.SP,
 			BP: vm.BP,
 			HP: vm.HP,
-		}[node.(Register)]
+		}[node]
 		return []vm.Code{reg}, nil
 	case Offset:
-		switch offset := node.(Offset); offset.Target {
+		switch offset := node; offset.Target {
 		case PC:
 			return []vm.Code{vm.PcOffset(offset.Diff)}, nil
 		case SP:
@@ -51,9 +51,9 @@ func convert(node Node) ([]vm.Code, error) {
 			return nil, fmt.Errorf("convert: unsupported offset: %s", offset.String())
 		}
 	case Number:
-		return []vm.Code{vm.Integer(node.(Number))}, nil
+		return []vm.Code{vm.Integer(node)}, nil
 	case Character:
-		return []vm.Code{vm.Character(node.(Character))}, nil
+		return []vm.Code{vm.Character(node)}, nil
 	default:
 		return nil, fmt.Errorf("convert: unsupported node: %s", node.String())
 	}
