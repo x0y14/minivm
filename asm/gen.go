@@ -27,16 +27,45 @@ func convert(node Node) ([]vm.Code, error) {
 		return result, nil
 	case Operation:
 		op := []vm.Code{
-			NOP: vm.NOP,
-			MOV: vm.MOV,
+			NOP:     vm.NOP,
+			MOV:     vm.MOV,
+			PUSH:    vm.PUSH,
+			POP:     vm.POP,
+			ALLOC:   vm.ALLOC,
+			STORE:   vm.STORE,
+			LOAD:    vm.LOAD,
+			CALL:    vm.CALL,
+			RET:     vm.RET,
+			JMP:     vm.JMP,
+			JZ:      vm.JZ,
+			JNZ:     vm.JNZ,
+			ADD:     vm.ADD,
+			SUB:     vm.SUB,
+			EQ:      vm.EQ,
+			NE:      vm.NE,
+			LT:      vm.LT,
+			LE:      vm.LE,
+			SYSCALL: vm.SYSCALL,
 		}[node]
 		return []vm.Code{op}, nil
 	case Register:
 		reg := []vm.Code{
-			PC: vm.PC,
-			SP: vm.SP,
-			BP: vm.BP,
-			HP: vm.HP,
+			PC:  vm.PC,
+			SP:  vm.SP,
+			BP:  vm.BP,
+			HP:  vm.HP,
+			R0:  vm.R0,
+			R1:  vm.R1,
+			R2:  vm.R2,
+			R3:  vm.R3,
+			R4:  vm.R4,
+			R5:  vm.R5,
+			R6:  vm.R6,
+			R7:  vm.R7,
+			R8:  vm.R8,
+			R9:  vm.R9,
+			R10: vm.R10,
+			ZF:  vm.ZF,
 		}[node]
 		return []vm.Code{reg}, nil
 	case Offset:
