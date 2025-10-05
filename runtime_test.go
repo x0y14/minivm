@@ -605,3 +605,137 @@ func TestModulo(t *testing.T) {
 		t.Errorf("R1 = %v, want %v (5 %% 3 = 2)", runtime.registers.generals[R1], Integer(2))
 	}
 }
+
+func TestFizzBuzz(t *testing.T) {
+	program := []Code{
+		// ヒープに作業バッファ確保（先頭アドレスは 0）
+		ALLOC, Integer(16),
+		POP, R10, // R10 = bufBase(=0)
+		MOV, R6, Integer(1), // i = 1
+		// loop_start:
+		MOV, R5, Integer(0), // printed = 0
+
+		// --- i % 3 ---
+		MOV, R7, R6, // tmp = i
+		MOV, R8, Integer(3), // d = 3
+		// mod3_loop:
+		LT, R7, R8, // if tmp < d then break
+		JZ, PcOffset(7), // -> after_mod3
+		SUB, R7, R8, // tmp -= d
+		JMP, PcOffset(-8), // -> mod3_loop
+		// after_mod3:
+		EQ, R7, Integer(0), // tmp == 0 ?
+		JZ, PcOffset(4), // -> print_fizz
+		JMP, PcOffset(30), // -> after_fizz
+
+		// print_fizz:
+		STORE, R10, Character('F'),
+		STORE, Integer(1), Character('i'),
+		STORE, Integer(2), Character('z'),
+		STORE, Integer(3), Character('z'),
+		MOV, R0, Integer(1), // SYS_WRITE
+		MOV, R1, Integer(1), // fd=1
+		MOV, R2, R10, // addr=buf
+		MOV, R3, Integer(4), // len=4
+		SYSCALL,
+		MOV, R5, Integer(1), // printed = 1
+
+		// after_fizz:
+		// --- i % 5 ---
+		MOV, R7, R6, // tmp = i
+		MOV, R8, Integer(5), // d = 5
+		// mod5_loop:
+		LT, R7, R8,
+		JZ, PcOffset(7), // -> after_mod5
+		SUB, R7, R8,
+		JMP, PcOffset(-8), // -> mod5_loop
+		// after_mod5:
+		EQ, R7, Integer(0),
+		JZ, PcOffset(4), // -> print_buzz
+		JMP, PcOffset(30), // -> after_buzz
+
+		// print_buzz:
+		STORE, R10, Character('B'),
+		STORE, Integer(1), Character('u'),
+		STORE, Integer(2), Character('z'),
+		STORE, Integer(3), Character('z'),
+		MOV, R0, Integer(1), // SYS_WRITE
+		MOV, R1, Integer(1), // fd=1
+		MOV, R2, R10, // addr=buf
+		MOV, R3, Integer(4), // len=4
+		SYSCALL,
+		MOV, R5, Integer(1), // printed = 1
+
+		// after_buzz:
+		// printed == 0 なら数字を出力
+		EQ, R5, Integer(0),
+		JZ, PcOffset(4), // -> print_number
+		JMP, PcOffset(78), // -> after_number
+
+		// print_number:
+		LT, R6, Integer(10),
+		JZ, PcOffset(51), // -> one_digit
+
+		// two_digit (10..15): '1' と下位桁で出力
+		MOV, R3, Character('1'),
+		STORE, R10, R3,
+		MOV, R0, Integer(1), // SYS_WRITE
+		MOV, R1, Integer(1), // fd=1
+		MOV, R2, R10, // addr=buf
+		MOV, R3, Integer(1), // len=1
+		SYSCALL,
+
+		MOV, R3, R6, // 下位桁 = i - 10 + '0'
+		SUB, R3, Integer(10),
+		ADD, R3, Integer('0'),
+		STORE, Integer(1), R3,
+		MOV, R0, Integer(1), // SYS_WRITE
+		MOV, R1, Integer(1), // fd=1
+		MOV, R2, R10, // addr=buf
+		ADD, R2, Integer(1), // addr+1
+		MOV, R3, Integer(1), // len=1
+		SYSCALL,
+		JMP, PcOffset(24), // -> after_number
+
+		// one_digit:
+		MOV, R3, Integer('0'),
+		ADD, R3, R6, // '0' + i
+		STORE, R10, R3,
+		MOV, R0, Integer(1), // SYS_WRITE
+		MOV, R1, Integer(1), // fd=1
+		MOV, R2, R10, // addr=buf
+		MOV, R3, Integer(1), // len=1
+		SYSCALL,
+
+		// after_number:
+		// 改行
+		STORE, R10, Character('\n'),
+		MOV, R0, Integer(1), // SYS_WRITE
+		MOV, R1, Integer(1), // fd=1
+		MOV, R2, R10, // addr=buf
+		MOV, R3, Integer(1), // len=1
+		SYSCALL,
+
+		// i++
+		ADD, R6, Integer(1),
+		LE, R6, Integer(15), // i <= 15 ?
+		JZ, PcOffset(-210), // -> loop_start
+		MOV, R0, Integer(0), // SYS_EXIT
+		SYSCALL,
+	}
+
+	config := &Config{StackSize: 1024, HeapSize: 1024}
+	rt := NewRuntime(program, config)
+
+	var buf bytes.Buffer
+	rt.stdout = &buf
+
+	if err := rt.Run(); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	want := "1\n2\nFizz\n4\nBuzz\nFizz\n7\n8\nFizz\nBuzz\n11\nFizz\n13\n14\nFizzBuzz\n"
+	if buf.String() != want {
+		t.Errorf("output = %q, want %q", buf.String(), want)
+	}
+}
