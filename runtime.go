@@ -431,8 +431,8 @@ func (r *Runtime) exec() error {
 			if _, ok := dst.(PcOffset); !ok {
 				return fmt.Errorf("call: unsupported dst: %s", dst.String())
 			}
-			// `call dst`の`dst`位置から相対計算
-			base := int(r.getSpecialReg(PC)) + code.NumOperands()
+			// 現在のpcから計算
+			base := int(r.getSpecialReg(PC))
 			diff := int(dst.(PcOffset))
 			dstAddr := Integer(base + diff)
 
@@ -460,8 +460,8 @@ func (r *Runtime) exec() error {
 			if _, ok := dst.(PcOffset); !ok {
 				return fmt.Errorf("jmp: unsupported dst: %s", dst.String())
 			}
-			// `jmp dst`の`dst`の位置から相対計算
-			base := int(r.getSpecialReg(PC)) + code.NumOperands()
+			// 現在のpcから計算
+			base := int(r.getSpecialReg(PC))
 			diff := int(dst.(PcOffset))
 			dstAddr := Integer(base + diff)
 			r.setSpecialReg(PC, dstAddr)
@@ -471,8 +471,8 @@ func (r *Runtime) exec() error {
 			if _, ok := dst.(PcOffset); !ok {
 				return fmt.Errorf("je: unsupported dst: %s", dst.String())
 			}
-			// `je dst`の`dst`の位置から相対計算
-			base := int(r.getSpecialReg(PC)) + code.NumOperands()
+			// 現在のpcから計算
+			base := int(r.getSpecialReg(PC))
 			diff := int(dst.(PcOffset))
 			dstAddr := Integer(base + diff)
 			if r.getFlagReg(ZF) {
@@ -486,8 +486,8 @@ func (r *Runtime) exec() error {
 			if _, ok := dst.(PcOffset); !ok {
 				return fmt.Errorf("jne: unsupported dst: %s", dst.String())
 			}
-			// `jne dst`の`dst`の位置から相対計算
-			base := int(r.getSpecialReg(PC)) + code.NumOperands()
+			// 現在のpcから計算
+			base := int(r.getSpecialReg(PC))
 			diff := int(dst.(PcOffset))
 			dstAddr := Integer(base + diff)
 			if !r.getFlagReg(ZF) {

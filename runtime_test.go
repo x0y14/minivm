@@ -199,7 +199,7 @@ func TestEQAndNE(t *testing.T) {
 
 func TestJMP(t *testing.T) {
 	program := []Code{
-		JMP, PcOffset(4), // skip next instruction
+		JMP, PcOffset(5), // skip next instruction
 		MOV, R1, Integer(999), // skipped
 		MOV, R0, Integer(0),
 		SYSCALL,
@@ -227,7 +227,7 @@ func TestJE(t *testing.T) {
 			name: "jump when equal",
 			program: []Code{
 				EQ, Integer(1), Integer(1),
-				JZ, PcOffset(4), // jump if equal
+				JZ, PcOffset(5), // jump if equal
 				MOV, R1, Integer(999), // skipped
 				MOV, R0, Integer(0),
 				SYSCALL,
@@ -271,7 +271,7 @@ func TestJNE(t *testing.T) {
 			name: "jump when not zero",
 			program: []Code{
 				EQ, Integer(1), Integer(2),
-				JNZ, PcOffset(4), // jump if not zero
+				JNZ, PcOffset(5), // jump if not zero
 				MOV, R1, Integer(999), // skipped
 				MOV, R0, Integer(0),
 				SYSCALL,
@@ -307,7 +307,7 @@ func TestJNE(t *testing.T) {
 
 func TestCALLAndRET(t *testing.T) {
 	program := []Code{
-		CALL, PcOffset(5), // call function
+		CALL, PcOffset(6), // call function
 		MOV, R0, Integer(0),
 		SYSCALL,
 		// function starts here
@@ -585,9 +585,9 @@ func TestModulo(t *testing.T) {
 		MOV, R4, Integer(3), // PC=2
 		// mod loop (PC=4)
 		LT, R3, R4, // PC=4: if R3 < 3, ZF=true
-		JZ, PcOffset(6), // PC=6: if ZF=true, jump to 6+2+4=12
+		JZ, PcOffset(7), // PC=6: if ZF=true, jump to 6+2+4=12
 		SUB, R3, R4, // PC=8: R3 -= 3
-		JMP, PcOffset(-9), // PC=10: jump to 10+2-8=4 (back to LT)
+		JMP, PcOffset(-8), // PC=10: jump to 10+2-8=4 (back to LT)
 		// R3 should be 2 (PC=12)
 		MOV, R1, R3, // PC=12
 		MOV, R0, Integer(0), // PC=14
