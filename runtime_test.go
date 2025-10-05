@@ -539,3 +539,69 @@ func TestSyscallRead(t *testing.T) {
 		t.Errorf("R5 = %v, want %v", runtime.registers.generals[R5], Character('i'))
 	}
 }
+
+func TestFizzBuzzSimple(t *testing.T) {
+	// まず"1\n"だけ出力するテスト
+	program := []Code{
+		ALLOC, Integer(2),
+		POP, R10,
+		MOV, R3, Integer('1'),
+		STORE, R10, R3,
+		MOV, R0, Integer(1), // SYS_WRITE
+		MOV, R1, Integer(1), // fd=1
+		MOV, R2, R10, // buffer
+		MOV, R3, Integer(1), // length=1
+		SYSCALL,
+		// newline
+		STORE, R10, Character('\n'),
+		MOV, R0, Integer(1),
+		MOV, R1, Integer(1),
+		MOV, R2, R10,
+		MOV, R3, Integer(1),
+		SYSCALL,
+		MOV, R0, Integer(0),
+		SYSCALL,
+	}
+
+	config := &Config{StackSize: 100, HeapSize: 100}
+	runtime := NewRuntime(program, config)
+
+	var buf bytes.Buffer
+	runtime.stdout = &buf
+
+	if err := runtime.Run(); err != nil {
+		t.Errorf("Run() error = %v", err)
+	}
+
+	if buf.String() != "1\n" {
+		t.Errorf("output = %q, want %q", buf.String(), "1\n")
+	}
+}
+
+func TestModulo(t *testing.T) {
+	// 5 % 3 = 2 を計算
+	program := []Code{
+		MOV, R3, Integer(5), // PC=0
+		MOV, R4, Integer(3), // PC=2
+		// mod loop (PC=4)
+		LT, R3, R4, // PC=4: if R3 < 3, ZF=true
+		JZ, PcOffset(6), // PC=6: if ZF=true, jump to 6+2+4=12
+		SUB, R3, R4, // PC=8: R3 -= 3
+		JMP, PcOffset(-9), // PC=10: jump to 10+2-8=4 (back to LT)
+		// R3 should be 2 (PC=12)
+		MOV, R1, R3, // PC=12
+		MOV, R0, Integer(0), // PC=14
+		SYSCALL, // PC=16
+	}
+
+	config := &Config{StackSize: 100, HeapSize: 100}
+	runtime := NewRuntime(program, config)
+
+	if err := runtime.Run(); err != nil {
+		t.Errorf("Run() error = %v", err)
+	}
+
+	if runtime.registers.generals[R1] != Integer(2) {
+		t.Errorf("R1 = %v, want %v (5 %% 3 = 2)", runtime.registers.generals[R1], Integer(2))
+	}
+}
