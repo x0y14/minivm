@@ -2,6 +2,7 @@ package vm
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 )
 
@@ -737,5 +738,177 @@ func TestFizzBuzz(t *testing.T) {
 	want := "1\n2\nFizz\n4\nBuzz\nFizz\n7\n8\nFizz\nBuzz\n11\nFizz\n13\n14\nFizzBuzz\n"
 	if buf.String() != want {
 		t.Errorf("output = %q, want %q", buf.String(), want)
+	}
+}
+
+// compileBF compiles a brainf*ck program into VM Code.
+// tape is allocated on heap and initialized to 0.
+func compileBF(src string, tapeSize int) []Code {
+	var code []Code
+
+	// Allocate tape and set data pointer (R9) = base
+	code = append(code,
+		ALLOC, Integer(tapeSize),
+		POP, R6, // R6 = base
+		MOV, R9, R6, // R9 = dp
+		MOV, R5, R6, // R5 = init cursor
+		MOV, R4, Integer(tapeSize), // R4 = tapeSize
+	)
+
+	// Initialize tape cells to 0
+	initLoopStart := len(code)
+	code = append(code,
+		STORE, R5, Integer(0), // *ptr = 0
+		ADD, R5, Integer(1), // ptr++
+		MOV, R7, R5, // tmp = ptr
+		SUB, R7, R6, // tmp = ptr - base
+		LT, R7, R4, // tmp < tapeSize ?
+		JZ, PcOffset(0), // if true, jump back to initLoopStart
+	)
+	initJZ := len(code) - 2
+	code[initJZ+1] = PcOffset(initLoopStart - initJZ)
+
+	type loopMark struct{ startIdx, jzIdx int }
+	var stack []loopMark
+
+	for _, ch := range src {
+		switch ch {
+		case '>':
+			code = append(code, ADD, R9, Integer(1))
+		case '<':
+			code = append(code, SUB, R9, Integer(1))
+		case '+':
+			code = append(code,
+				LOAD, R7, R9,
+				ADD, R7, Integer(1),
+				STORE, R9, R7,
+			)
+		case '-':
+			code = append(code,
+				LOAD, R7, R9,
+				SUB, R7, Integer(1),
+				STORE, R9, R7,
+			)
+		case '.':
+			code = append(code,
+				MOV, R0, Integer(1), // SYS_WRITE
+				MOV, R1, Integer(1), // fd=1
+				MOV, R2, R9, // addr = dp
+				MOV, R3, Integer(1), // len=1
+				SYSCALL,
+			)
+		case ',':
+			code = append(code,
+				MOV, R0, Integer(2), // SYS_READ
+				MOV, R1, Integer(0), // fd=0
+				MOV, R2, R9, // addr = dp
+				MOV, R3, Integer(1), // len=1
+				SYSCALL,
+			)
+		case '[':
+			startIdx := len(code)
+			code = append(code,
+				LOAD, R7, R9, // v = *dp
+				EQ, R7, Integer(0), // v == 0 ?
+				JZ, PcOffset(0), // if true -> jump to after ']'
+			)
+			stack = append(stack, loopMark{startIdx: startIdx, jzIdx: len(code) - 2})
+		case ']':
+			if len(stack) == 0 {
+				continue
+			}
+			top := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+
+			// if *dp != 0 then jump back to loop start
+			code = append(code,
+				LOAD, R7, R9,
+				NE, R7, Integer(0),
+				JZ, PcOffset(0), // NOTE: use JZ (ZF==true when NE is true)
+			)
+			jmpIdx := len(code) - 2 // index of JZ
+			// back to loop start ('[' の LOAD に戻る)
+			code[jmpIdx+1] = PcOffset(top.startIdx - jmpIdx)
+			// patch JZ at '[' to jump to after this ']' (JZ の直後 = opcode+operand の2つ先)
+			code[top.jzIdx+1] = PcOffset((jmpIdx + 2) - top.jzIdx)
+		default:
+			// ignore
+		}
+	}
+
+	// Exit
+	code = append(code, MOV, R0, Integer(0), SYSCALL)
+	return code
+}
+
+func TestBrainfuck_PrintA_WithPluses(t *testing.T) {
+	prog := compileBF(strings.Repeat("+", 65)+".", 64)
+
+	cfg := &Config{StackSize: 4096, HeapSize: 8192}
+	rt := NewRuntime(prog, cfg)
+
+	var out bytes.Buffer
+	rt.stdout = &out
+
+	if err := rt.Run(); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if got, want := out.String(), "A"; got != want {
+		t.Errorf("stdout = %q, want %q", got, want)
+	}
+}
+
+func TestBrainfuck_Echo(t *testing.T) {
+	prog := compileBF(",.", 8)
+
+	cfg := &Config{StackSize: 4096, HeapSize: 8192}
+	rt := NewRuntime(prog, cfg)
+
+	rt.stdin = bytes.NewBufferString("Z")
+	var out bytes.Buffer
+	rt.stdout = &out
+
+	if err := rt.Run(); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if got, want := out.String(), "Z"; got != want {
+		t.Errorf("stdout = %q, want %q", got, want)
+	}
+}
+
+func TestBrainfuck_Loop_GeneratesA(t *testing.T) {
+	// "A" = 65 = 6*10 + 5
+	src := "++++++[>++++++++++<-]>+++++."
+	prog := compileBF(src, 64)
+
+	cfg := &Config{StackSize: 4096, HeapSize: 8192}
+	rt := NewRuntime(prog, cfg)
+
+	var out bytes.Buffer
+	rt.stdout = &out
+
+	if err := rt.Run(); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if got, want := out.String(), "A"; got != want {
+		t.Errorf("stdout = %q, want %q", got, want)
+	}
+}
+
+func TestBrainfuck_Loop_GeneratesHelloWorld(t *testing.T) {
+	src := "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n++++++++++++++++++++++++++++++++++++++++.---.+++++++..+++.++++++\n++.--------.+++.------.--------."
+	prog := compileBF(src, 64*64)
+
+	cfg := &Config{StackSize: 4096, HeapSize: 8192}
+	rt := NewRuntime(prog, cfg)
+
+	var out bytes.Buffer
+	rt.stdout = &out
+
+	if err := rt.Run(); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if got, want := out.String(), "helloworld"; got != want {
+		t.Errorf("stdout = %q, want %q", got, want)
 	}
 }
