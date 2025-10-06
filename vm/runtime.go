@@ -549,7 +549,15 @@ func (r *Runtime) exec() error {
 				if !calculable(v, srcValue) {
 					return fmt.Errorf("add: unsupported values: %T += %T", v, srcValue)
 				}
-				res := Integer(v.Value() + srcValue.Value())
+				var res Immediate
+				switch typeof(v) {
+				case TInt:
+					res = Integer(v.Value() + srcValue.Value())
+				case TChar:
+					res = Character(v.Value() + srcValue.Value())
+				default:
+					return fmt.Errorf("add: unsupported values: %T += %T", v, srcValue)
+				}
 				r.setFlagReg(ZF, res.Value() == 0)
 				return r.setReg(dst.(Register), res)
 			case Offset:
@@ -560,7 +568,15 @@ func (r *Runtime) exec() error {
 				if !calculable(v, srcValue) {
 					return fmt.Errorf("add: unsupported values: %T += %T", v, srcValue)
 				}
-				res := Integer(v.Value() + srcValue.Value())
+				var res Immediate
+				switch typeof(v) {
+				case TInt:
+					res = Integer(v.Value() + srcValue.Value())
+				case TChar:
+					res = Character(v.Value() + srcValue.Value())
+				default:
+					return fmt.Errorf("add: unsupported values: %T += %T", v, srcValue)
+				}
 				r.setFlagReg(ZF, res.Value() == 0)
 				return r.setStack(dst.(Offset), res)
 			default:

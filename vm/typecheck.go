@@ -6,6 +6,7 @@ const (
 	TUndefined Type = iota
 	TInt
 	TBool
+	TChar
 )
 
 func typeof(imm Immediate) Type {
@@ -14,6 +15,8 @@ func typeof(imm Immediate) Type {
 		return TInt
 	case Boolean:
 		return TBool
+	case Character:
+		return TChar
 	default:
 		return TUndefined
 	}
@@ -24,11 +27,14 @@ func match(imm1, imm2 Immediate) bool {
 }
 
 func calculable(imm1, imm2 Immediate) bool {
-	if !match(imm1, imm2) {
+	switch {
+	case match(imm1, imm2):
+		return true
+	case typeof(imm1) == TInt && typeof(imm2) == TChar:
+		return true
+	case typeof(imm1) == TChar && typeof(imm2) == TInt:
+		return true
+	default:
 		return false
 	}
-	if typeof(imm1) != TInt {
-		return false
-	}
-	return true
 }
