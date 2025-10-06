@@ -71,6 +71,13 @@ func TestParse_Offsets(t *testing.T) {
 				STORE, Offset{Target: BP, Diff: -2}, R3,
 			},
 		},
+		{
+			name:  "char",
+			input: "'r'1",
+			expect: []Node{
+				Character('r'), Number(1),
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
