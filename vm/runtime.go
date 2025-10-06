@@ -884,7 +884,8 @@ func (r *Runtime) exec() error {
 				}
 				buf := make([]byte, length)
 				got, err := rd.Read(buf)
-				if err != nil {
+				// EOF は正常終了扱いにする（n>0 の EOF も含めて継続）
+				if err != nil && err != io.EOF {
 					return err
 				}
 				if got > 0 {
