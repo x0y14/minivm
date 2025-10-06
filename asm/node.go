@@ -148,6 +148,161 @@ func (c Character) String() string {
 	return strconv.QuoteRune(rune(c))
 }
 
-func Parse(token *Token) ([]Instruction, error) {
-	return nil, nil
+var curt *Token
+
+func expect(kind TokenKind) (*Token, error) {
+	if curt.Kind != kind {
+		return nil, fmt.Errorf("want=%s, got=%s", kind.String(), curt.Kind.String())
+	}
+	v := *curt
+	curt = curt.Next
+	return &v, nil
+}
+func consume(kind TokenKind) *Token {
+	if curt.Kind != kind {
+		return nil
+	}
+	v := *curt
+	curt = curt.Next
+	return &v
+}
+
+func parsePcOffset() ([]Node, error) {
+	// (
+	if _, err := expect(Lrb); err != nil {
+		return nil, err
+	}
+
+	// +
+	plus := consume(Add)
+	// -
+	minus := consume(Sub)
+	if plus != nil && minus != nil {
+		return nil, fmt.Errorf("syntax err")
+	}
+
+	// diff
+	diff, err := expect(Integer)
+	if err != nil {
+		return nil, err
+	}
+
+	// )
+	if _, err = expect(Rrb); err != nil {
+		return nil, err
+	}
+
+	v, err := diff.GetValueAsInteger()
+	if err != nil {
+		return nil, err
+	}
+	if minus != nil {
+		return []Node{Offset{PC, -v}}, nil
+	}
+	return []Node{Offset{PC, v}}, nil
+}
+
+func parseStackOffset() ([]Node, error) {
+	// [
+	if _, err := expect(Lcb); err != nil {
+		return nil, err
+	}
+
+	// sp / bp
+	id, err := expect(Identifier)
+	if err != nil {
+		return nil, err
+	}
+	var reg Register
+	switch string(id.Raw) {
+	case "sp":
+		reg = SP
+	case "bp":
+		reg = BP
+	default:
+		return nil, fmt.Errorf("unsupported register: %s", string(id.Raw))
+	}
+
+	// +
+	plus := consume(Add)
+	// -
+	minus := consume(Sub)
+	if plus != nil && minus != nil {
+		return nil, fmt.Errorf("syntax err")
+	}
+
+	// diff
+	diff, err := expect(Integer)
+	if err != nil {
+		return nil, err
+	}
+
+	// ]
+	if _, err := expect(Rcb); err != nil {
+		return nil, err
+	}
+
+	v, err := diff.GetValueAsInteger()
+	if err != nil {
+		return nil, err
+	}
+	if minus != nil {
+		return []Node{Offset{reg, -v}}, nil
+	}
+	return []Node{Offset{reg, v}}, nil
+}
+
+func Parse(token *Token) ([]Node, error) {
+	var nodes []Node
+	curt = token
+loop:
+	for {
+		switch curt.Kind {
+		case Eof:
+			break loop
+		case Comment:
+			curt = curt.Next
+		case Identifier:
+			if op, yes := isOperation(string(curt.Raw)); yes {
+				nodes = append(nodes, op)
+				curt = curt.Next
+				continue
+			}
+			if reg, yes := isRegister(string(curt.Raw)); yes {
+				nodes = append(nodes, reg)
+				curt = curt.Next
+				continue
+			}
+			return nil, fmt.Errorf("parse: unsupported ident: %s", string(curt.Raw))
+		case Integer:
+			v, err := curt.GetValueAsInteger()
+			if err != nil {
+				return nil, err
+			}
+			nodes = append(nodes, Number(v))
+			curt = curt.Next
+		case Char:
+			v, err := curt.GetValueAsRune()
+			if err != nil {
+				return nil, err
+			}
+			nodes = append(nodes, Character(v))
+			curt = curt.Next
+		case Lrb:
+			nds, err := parsePcOffset()
+			if err != nil {
+				return nil, err
+			}
+			nodes = append(nodes, nds...)
+		case Lcb:
+			nds, err := parseStackOffset()
+			if err != nil {
+				return nil, err
+			}
+			nodes = append(nodes, nds...)
+		default:
+			return nil, fmt.Errorf("parse: unsupported token: %s", curt.Kind.String())
+		}
+	}
+	return nodes, nil
 }

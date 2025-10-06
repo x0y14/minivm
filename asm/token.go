@@ -23,7 +23,7 @@ const (
 
 	Identifier
 	Integer
-	String
+	Char
 
 	Lrb // (
 	Rrb // )
@@ -46,7 +46,7 @@ func (tk TokenKind) String() string {
 		Comment:    "Comment",
 		Identifier: "Identifier",
 		Integer:    "Integer",
-		String:     "String",
+		Char:       "Char",
 		Lrb:        "(",
 		Rrb:        ")",
 		Lcb:        "[",
@@ -55,6 +55,7 @@ func (tk TokenKind) String() string {
 		Dot:        ".",
 		Colon:      ":",
 		Add:        "+",
+		Sub:        "-",
 		Mul:        "*",
 	}
 	return kinds[tk]
@@ -78,11 +79,11 @@ func (t *Token) GetValueAsInteger() (int, error) {
 	return int(i64), nil
 }
 
-func (t *Token) GetValueAsString() (string, error) {
-	if t.Kind != String {
-		return "", fmt.Errorf("type mismatch: actual=%s", t.Kind.String())
+func (t *Token) GetValueAsRune() (rune, error) {
+	if t.Kind != Char {
+		return 0, fmt.Errorf("type mismatch: actua=%s", t.Kind.String())
 	}
-	return string(t.Raw), nil
+	return t.Raw[0], nil
 }
 
 func comment() (*Token, error) {
@@ -167,6 +168,27 @@ func symbol() (*Token, error) {
 	return &tok, nil
 }
 
+func char() (*Token, error) {
+	tok := Token{Kind: Char, Position: Position{loc.atInLine, loc.line}}
+
+	// '
+	loc.at++
+	loc.atInLine++
+
+	tok.Raw = []rune{text[loc.at]}
+	loc.at++
+	loc.atInLine++
+
+	if text[loc.at] != '\'' {
+		return nil, fmt.Errorf("unexpected token: want=', got=%s", string(text[loc.at]))
+	}
+	// '
+	loc.at++
+	loc.atInLine++
+
+	return &tok, nil
+}
+
 func Tokenize(input []rune) (*Token, error) {
 	text = input
 	loc = location{0, 0, 0}
@@ -184,6 +206,13 @@ func Tokenize(input []rune) (*Token, error) {
 			loc.atInLine = 0
 		case r == ';':
 			tok, err := comment()
+			if err != nil {
+				return nil, err
+			}
+			curt.Next = tok
+			curt = curt.Next
+		case r == '\'':
+			tok, err := char()
 			if err != nil {
 				return nil, err
 			}
