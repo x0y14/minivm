@@ -31,7 +31,7 @@ type PcOffset int
 
 func (p PcOffset) isCode() {}
 func (p PcOffset) String() string {
-	return fmt.Sprintf("[%s%+d]", PC.String(), p)
+	return fmt.Sprintf("(%+d)", p)
 }
 func (p PcOffset) isOperand() {}
 func (p PcOffset) isOffset()  {}
