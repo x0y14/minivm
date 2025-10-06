@@ -9,6 +9,10 @@ import (
 type Config struct {
 	StackSize int
 	HeapSize  int
+
+	stdin  io.Reader
+	stdout io.Writer
+	stderr io.Writer
 }
 
 type registerSet struct {
@@ -54,6 +58,21 @@ func NewRuntime(program []Code, config *Config) *Runtime {
 			ZF: false,
 		},
 	}
+
+	// fds
+	var stdin io.Reader = os.Stdin
+	var stdout io.Writer = os.Stdout
+	var stderr io.Writer = os.Stderr
+	if config.stdin != nil {
+		stdin = config.stdin
+	}
+	if config.stdout != nil {
+		stdout = config.stdout
+	}
+	if config.stderr != nil {
+		stderr = config.stderr
+	}
+
 	return &Runtime{
 		program:   program,
 		registers: regs,
@@ -61,9 +80,9 @@ func NewRuntime(program []Code, config *Config) *Runtime {
 		heap:      make([]Immediate, config.HeapSize),
 		halt:      false,
 
-		stdin:  os.Stdin,
-		stdout: os.Stdout,
-		stderr: os.Stderr,
+		stdin:  stdin,
+		stdout: stdout,
+		stderr: stderr,
 	}
 }
 
