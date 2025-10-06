@@ -175,7 +175,26 @@ func char() (*Token, error) {
 	loc.at++
 	loc.atInLine++
 
-	tok.Raw = []rune{text[loc.at]}
+	var r rune
+	if text[loc.at] == '\\' {
+		// エスケープシーケンス
+		loc.at++
+		loc.atInLine++
+		switch text[loc.at] {
+		case 'n':
+			r = '\n'
+		case 't':
+			r = '\t'
+		case '\\':
+			r = '\\'
+		case '\'':
+			r = '\''
+		default:
+			return nil, fmt.Errorf("unsupported escape: \\%c", text[loc.at])
+		}
+	} else {
+		r = text[loc.at]
+	}
 	loc.at++
 	loc.atInLine++
 
@@ -186,6 +205,7 @@ func char() (*Token, error) {
 	loc.at++
 	loc.atInLine++
 
+	tok.Raw = []rune{r}
 	return &tok, nil
 }
 
