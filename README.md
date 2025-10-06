@@ -7,12 +7,22 @@
 ## Usage
 show help
 ```shell
-go run ./cmd/minivm/main.go help
+$ go run ./cmd/minivm/main.go help
 ```
 
 run fizzbuzz
 ```shell
-go run ./cmd/minivm/main.go run ./examples/fizzbuzz.mini
+$ go run ./cmd/minivm/main.go run ./examples/fizzbuzz.mini
+```
+
+brainf*ck
+```shell
+# 末尾に!をつけてください
+$ go run ./cmd/minivm/main.go run -stack 32768 -heap 131072 ./examples/brainfuck.mini
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+++++++++++++++++++++++++++++++++++++++++.---.+++++++..+++.++++++
+++.--------.+++.------.--------.!
+> helloworld
 ```
 
 ## ABI
