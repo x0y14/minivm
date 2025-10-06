@@ -4,6 +4,17 @@
 
 スタックとヒープがあります
 
+## Usage
+show help
+```shell
+go run ./cmd/minivm/main.go help
+```
+
+run fizzbuzz
+```shell
+go run ./cmd/minivm/main.go run ./examples/fizzbuzz.mini
+```
+
 ## ABI
 ### レジスタの種類
 | Register名      | 用途              |
