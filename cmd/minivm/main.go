@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/urfave/cli/v3"
 	"github.com/x0y14/minivm/asm"
@@ -12,6 +13,9 @@ import (
 )
 
 func readAsm(path string) (string, error) {
+	if !strings.HasSuffix(path, ".mini") {
+		return "", fmt.Errorf("error: unsupported file: %s", path)
+	}
 	bytes, err := os.ReadFile(path)
 	if err != nil {
 		return "", err
