@@ -1,4 +1,4 @@
-package asm
+package bytecode
 
 type Position struct {
 	StartedAt int

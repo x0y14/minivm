@@ -1,4 +1,4 @@
-package asm
+package bytecode
 
 import (
 	"math/rand"

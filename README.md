@@ -12,13 +12,13 @@ $ go run ./cmd/minivm/main.go help
 
 run fizzbuzz
 ```shell
-$ go run ./cmd/minivm/main.go run ./examples/fizzbuzz.mini
+$ go run ./cmd/minivm/main.go run ./examples/fizzbuzz.mbyt
 ```
 
 brainf*ck
 ```shell
 # 末尾に!をつけてください
-$ go run ./cmd/minivm/main.go run -stack 32768 -heap 131072 ./examples/brainfuck.mini
+$ go run ./cmd/minivm/main.go run -stack 32768 -heap 131072 ./examples/brainfuck.mbyt
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ++++++++++++++++++++++++++++++++++++++++.---.+++++++..+++.++++++
 ++.--------.+++.------.--------.!

@@ -1,4 +1,4 @@
-package asm
+package bytecode
 
 func isOperation(ident string) (Operation, bool) {
 	switch ident {
