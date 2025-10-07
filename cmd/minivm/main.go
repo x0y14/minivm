@@ -8,12 +8,12 @@ import (
 	"strings"
 
 	"github.com/urfave/cli/v3"
-	"github.com/x0y14/minivm/asm"
+	"github.com/x0y14/minivm/bytecode"
 	"github.com/x0y14/minivm/vm"
 )
 
 func readAsm(path string) (string, error) {
-	if !strings.HasSuffix(path, ".mini") {
+	if !strings.HasSuffix(path, ".mbyt") {
 		return "", fmt.Errorf("error: unsupported file: %s", path)
 	}
 	bytes, err := os.ReadFile(path)
@@ -71,17 +71,17 @@ func main() {
 						return err
 					}
 					// tokenize
-					tokens, err := asm.Tokenize([]rune(assembly))
+					tokens, err := bytecode.Tokenize([]rune(assembly))
 					if err != nil {
 						return err
 					}
 					// parse
-					nodes, err := asm.Parse(tokens)
+					nodes, err := bytecode.Parse(tokens)
 					if err != nil {
 						return err
 					}
 					// gen code
-					codes, err := asm.Gen(nodes)
+					codes, err := bytecode.Gen(nodes)
 					if err != nil {
 						return err
 					}
