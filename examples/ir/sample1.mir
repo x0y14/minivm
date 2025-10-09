@@ -1,0 +1,125 @@
+.import "std.mir"
+.export "_print_fizz"
+
+.data:
+    msg auto "hello"
+    arr auto 10, 20, 30
+
+.text:
+    global _start
+
+_start:
+    alloc 16        ; bufbase = 0
+    pop r10         ; r10 = bufbase(=0)
+    mov r6 1        ; i =1
+
+_loop_start:
+    mov r5 0        ; printed = 0
+
+    ; i % 3
+    mov r7 r6       ; tmp = i
+    mov r8 3        ; d = 3
+_mod3_loop:
+    lt r7 r8        ; if tmp < d then break
+    jz _after_mod3
+    sub r7 r8       ; tmp -= d
+    jmp _mod3_loop
+_after_mod3:
+    eq r7 0         ; tmp == 0?
+    jz _print_fizz
+    jmp _after_fizz
+
+_print_fizz:
+    store r10 'F'
+    store 1 'i'
+    store 2 'z'
+    store 3 'z'
+    mov r0 1        ; sys_write
+    mov r1 1        ; fd = 1
+    mov r2 r10      ; addr = buf
+    mov r3 4        ; len = 4
+    syscall
+    mov r5 1        ; printed = 1
+
+_after_fizz:
+    ; i % 5
+    mov r7 r6       ; tmp = i
+    mov r8 5        ; d = 5
+_mod5_lop:
+    lt r7 r8
+    jz _after_mod5
+    sub r7 r8
+    jmp _mod5_loop
+_after_mod5:
+    eq r7 0
+    jz _print_buzz
+    jmp _after_buzz
+
+_print_buzz:
+    store r10 'B'
+    store 1 'u'
+    store 2 'z'
+    store 3 'z'
+    mov r0 1        ; sys_write
+    mov r1 1        ; fd = 1
+    mov r2 r10      ; addr = buf
+    mov r3 4        ; len = 4
+    syscall
+    mov r5 1        ; printed = 1
+
+_after_buzz:
+    ; printed == 0 なら数字を出力
+    eq r5 0
+    jz _print_number
+    jmp _after_number
+
+_print_number:
+    lt r6 10
+    jz _one_digit
+
+_two_digit:
+    mov r3 '1'
+    store r10 r3
+    mov r0 1        ; sys_write
+    mov r1 1        ; fd = 1
+    mov r2 r10      ; addr = buf
+    mov r3 1        ; len = 1
+    syscall
+
+    mov r3 r6       ; 下位桁 = i -10 + '0'
+    sub r3 10
+    add r3 '0'
+    store 1 r3
+    mov r0 1        ; sys_write
+    mov r1 1        ; fd = 1
+    mov r2 r10      ; addr = buf
+    add r2 1        ; addr += 1
+    mov r3 1        ; len = 1
+    syscall
+    jmp _after_number
+
+_one_digit:
+    mov r3 '0'
+    add r3 r6       ; '0' + i
+    store r10 r3
+    mov r0 1        ; sys_write
+    mov r1 1        ; fd = 1
+    mov r2 r10      ; addr = buf
+    mov r3 1        ; len = 1
+    syscall
+
+_after_number:
+    ; 改行
+    store r10 '\n'
+    mov r0 1        ; sys_write
+    mov r1 1        ; fd = 1
+    mov r2 r10      ; addr = buf
+    mov r3 1        ; len = 1
+    syscall
+
+    ; i++
+    add r6 1
+    le r6 15        ; i <= 15?
+    jz _loop_start
+    mov r0 0        ; sys_exit
+    syscall
