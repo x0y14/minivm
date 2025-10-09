@@ -1,5 +1,5 @@
-.import "printf"
-.export "_print_fizz"
+.import printf
+.export _print_fizz
 
 .data:
     msg auto "hello"
