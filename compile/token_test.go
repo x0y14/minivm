@@ -1,4 +1,4 @@
-package bytecode
+package compile
 
 import (
 	"math/rand"
