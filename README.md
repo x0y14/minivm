@@ -12,18 +12,26 @@ $ go run ./cmd/minivm/main.go help
 
 run fizzbuzz
 ```shell
-$ go run ./cmd/minivm/main.go run ./examples/fizzbuzz.mbyt
+$ go run ./cmd/minivm/main.go run ./examples/bytecode/fizzbuzz.mbyt
 ```
 
 brainf*ck
 ```shell
 # 末尾に!をつけてください
-$ go run ./cmd/minivm/main.go run -stack 32768 -heap 131072 ./examples/brainfuck.mbyt
+$ go run ./cmd/minivm/main.go run -stack 32768 -heap 131072 ./examples/bytecode/brainfuck.mbyt
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ++++++++++++++++++++++++++++++++++++++++.---.+++++++..+++.++++++
 ++.--------.+++.------.--------.!
 > helloworld
 ```
+
+## ファイル種別
+
+### *.mobj
+ある程度人間が読めるオブジェクト。ラベルとかがそのまま残っていて、リンク可能
+
+### *.mbyt
+なんちゃってバイトコード。vmはこれをインタプリタで逐次実行します
 
 ## ABI
 ### レジスタの種類
