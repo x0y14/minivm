@@ -1,4 +1,4 @@
-package compile
+package ir
 
 import (
 	"math/rand"

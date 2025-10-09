@@ -1,4 +1,4 @@
-package bytecode
+package ir
 
 import (
 	"testing"
@@ -39,23 +39,16 @@ func TestParse_Offsets(t *testing.T) {
 	}{
 		{
 			name:  "pc offset +",
-			input: "jmp (+3)",
+			input: "_label:",
 			expect: []Node{
-				JMP, Offset{Target: PC, Diff: 3},
+				Label{true, "_label"},
 			},
 		},
 		{
 			name:  "pc offset -",
-			input: "jmp (-15)",
+			input: "jmp _label",
 			expect: []Node{
-				JMP, Offset{Target: PC, Diff: -15},
-			},
-		},
-		{
-			name:  "pc offset no sign",
-			input: "jmp (7)",
-			expect: []Node{
-				JMP, Offset{Target: PC, Diff: 7},
+				JMP, Label{false, "_label"},
 			},
 		},
 		{
@@ -113,17 +106,6 @@ func TestParse_SkipComment(t *testing.T) {
 	}
 	if diff := cmp.Diff(expect, nodes); diff != "" {
 		t.Errorf("diff:\n%s", diff)
-	}
-}
-
-func TestParse_Error_UnsupportedIdent(t *testing.T) {
-	input := "unknown"
-	toks, err := compile.Tokenize([]rune(input))
-	if err != nil {
-		t.Fatalf("tokenize error: %v", err)
-	}
-	if _, err := Parse(toks); err == nil {
-		t.Fatalf("expected error, got nil")
 	}
 }
 

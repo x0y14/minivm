@@ -1,4 +1,4 @@
-package compile
+package ir
 
 type Position struct {
 	StartedAt int

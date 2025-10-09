@@ -1,11 +1,9 @@
-package object
+package bytecode
 
 import (
 	"fmt"
 	"strconv"
 	"strings"
-
-	"github.com/x0y14/minivm/compile"
 )
 
 type Node interface {
@@ -150,19 +148,9 @@ func (c Character) String() string {
 	return strconv.QuoteRune(rune(c))
 }
 
-type Label struct {
-	Define bool
-	Name   string
-}
+var curt *Token
 
-func (l Label) isNode() {}
-func (l Label) String() string {
-	return l.Name
-}
-
-var curt *compile.Token
-
-func expect(kind compile.TokenKind) (*compile.Token, error) {
+func expect(kind TokenKind) (*Token, error) {
 	if curt.Kind != kind {
 		return nil, fmt.Errorf("want=%s, got=%s", kind.String(), curt.Kind.String())
 	}
@@ -170,7 +158,7 @@ func expect(kind compile.TokenKind) (*compile.Token, error) {
 	curt = curt.Next
 	return &v, nil
 }
-func consume(kind compile.TokenKind) *compile.Token {
+func consume(kind TokenKind) *Token {
 	if curt.Kind != kind {
 		return nil
 	}
@@ -179,14 +167,49 @@ func consume(kind compile.TokenKind) *compile.Token {
 	return &v
 }
 
+func parsePcOffset() ([]Node, error) {
+	// (
+	if _, err := expect(Lrb); err != nil {
+		return nil, err
+	}
+
+	// +
+	plus := consume(Add)
+	// -
+	minus := consume(Sub)
+	if plus != nil && minus != nil {
+		return nil, fmt.Errorf("syntax err")
+	}
+
+	// diff
+	diff, err := expect(Integer)
+	if err != nil {
+		return nil, err
+	}
+
+	// )
+	if _, err = expect(Rrb); err != nil {
+		return nil, err
+	}
+
+	v, err := diff.GetValueAsInteger()
+	if err != nil {
+		return nil, err
+	}
+	if minus != nil {
+		return []Node{Offset{PC, -v}}, nil
+	}
+	return []Node{Offset{PC, v}}, nil
+}
+
 func parseStackOffset() ([]Node, error) {
 	// [
-	if _, err := expect(compile.Lcb); err != nil {
+	if _, err := expect(Lcb); err != nil {
 		return nil, err
 	}
 
 	// sp / bp
-	id, err := expect(compile.Identifier)
+	id, err := expect(Identifier)
 	if err != nil {
 		return nil, err
 	}
@@ -201,21 +224,21 @@ func parseStackOffset() ([]Node, error) {
 	}
 
 	// +
-	plus := consume(compile.Add)
+	plus := consume(Add)
 	// -
-	minus := consume(compile.Sub)
+	minus := consume(Sub)
 	if plus != nil && minus != nil {
 		return nil, fmt.Errorf("syntax err")
 	}
 
 	// diff
-	diff, err := expect(compile.Integer)
+	diff, err := expect(Integer)
 	if err != nil {
 		return nil, err
 	}
 
 	// ]
-	if _, err := expect(compile.Rcb); err != nil {
+	if _, err := expect(Rcb); err != nil {
 		return nil, err
 	}
 
@@ -229,33 +252,17 @@ func parseStackOffset() ([]Node, error) {
 	return []Node{Offset{reg, v}}, nil
 }
 
-func parseLabel() ([]Node, error) {
-	// id
-	id, err := expect(compile.Identifier)
-	if err != nil {
-		return nil, err
-	}
-
-	// :
-	var define = false
-	if t := consume(compile.Colon); t != nil {
-		define = true
-	}
-
-	return []Node{Label{define, string(id.Raw)}}, nil
-}
-
-func Parse(token *compile.Token) ([]Node, error) {
+func Parse(token *Token) ([]Node, error) {
 	var nodes []Node
 	curt = token
 loop:
 	for {
 		switch curt.Kind {
-		case compile.Eof:
+		case Eof:
 			break loop
-		case compile.Comment:
+		case Comment:
 			curt = curt.Next
-		case compile.Identifier:
+		case Identifier:
 			if op, yes := isOperation(string(curt.Raw)); yes {
 				nodes = append(nodes, op)
 				curt = curt.Next
@@ -266,26 +273,28 @@ loop:
 				curt = curt.Next
 				continue
 			}
-			nds, err := parseLabel()
-			if err != nil {
-				return nil, err
-			}
-			nodes = append(nodes, nds...)
-		case compile.Integer:
+			return nil, fmt.Errorf("parse: unsupported ident: %s", string(curt.Raw))
+		case Integer:
 			v, err := curt.GetValueAsInteger()
 			if err != nil {
 				return nil, err
 			}
 			nodes = append(nodes, Number(v))
 			curt = curt.Next
-		case compile.Char:
+		case Char:
 			v, err := curt.GetValueAsRune()
 			if err != nil {
 				return nil, err
 			}
 			nodes = append(nodes, Character(v))
 			curt = curt.Next
-		case compile.Lcb:
+		case Lrb:
+			nds, err := parsePcOffset()
+			if err != nil {
+				return nil, err
+			}
+			nodes = append(nodes, nds...)
+		case Lcb:
 			nds, err := parseStackOffset()
 			if err != nil {
 				return nil, err

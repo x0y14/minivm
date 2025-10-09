@@ -1,11 +1,9 @@
-package bytecode
+package ir
 
 import (
 	"fmt"
 	"strconv"
 	"strings"
-
-	"github.com/x0y14/minivm/compile"
 )
 
 type Node interface {
@@ -150,9 +148,34 @@ func (c Character) String() string {
 	return strconv.QuoteRune(rune(c))
 }
 
-var curt *compile.Token
+type Label struct {
+	Define bool
+	Name   string
+}
 
-func expect(kind compile.TokenKind) (*compile.Token, error) {
+func (l Label) isNode() {}
+func (l Label) String() string {
+	return l.Name
+}
+
+type DirectiveKind int
+
+const (
+	_ DirectiveKind = iota
+	IMPORT
+	EXPORT
+	DATA
+	TEXT
+)
+
+type Directive struct {
+	Kind DirectiveKind
+	Args []Node
+}
+
+var curt *Token
+
+func expect(kind TokenKind) (*Token, error) {
 	if curt.Kind != kind {
 		return nil, fmt.Errorf("want=%s, got=%s", kind.String(), curt.Kind.String())
 	}
@@ -160,7 +183,7 @@ func expect(kind compile.TokenKind) (*compile.Token, error) {
 	curt = curt.Next
 	return &v, nil
 }
-func consume(kind compile.TokenKind) *compile.Token {
+func consume(kind TokenKind) *Token {
 	if curt.Kind != kind {
 		return nil
 	}
@@ -169,49 +192,14 @@ func consume(kind compile.TokenKind) *compile.Token {
 	return &v
 }
 
-func parsePcOffset() ([]Node, error) {
-	// (
-	if _, err := expect(compile.Lrb); err != nil {
-		return nil, err
-	}
-
-	// +
-	plus := consume(compile.Add)
-	// -
-	minus := consume(compile.Sub)
-	if plus != nil && minus != nil {
-		return nil, fmt.Errorf("syntax err")
-	}
-
-	// diff
-	diff, err := expect(compile.Integer)
-	if err != nil {
-		return nil, err
-	}
-
-	// )
-	if _, err = expect(compile.Rrb); err != nil {
-		return nil, err
-	}
-
-	v, err := diff.GetValueAsInteger()
-	if err != nil {
-		return nil, err
-	}
-	if minus != nil {
-		return []Node{Offset{PC, -v}}, nil
-	}
-	return []Node{Offset{PC, v}}, nil
-}
-
 func parseStackOffset() ([]Node, error) {
 	// [
-	if _, err := expect(compile.Lcb); err != nil {
+	if _, err := expect(Lcb); err != nil {
 		return nil, err
 	}
 
 	// sp / bp
-	id, err := expect(compile.Identifier)
+	id, err := expect(Identifier)
 	if err != nil {
 		return nil, err
 	}
@@ -226,21 +214,21 @@ func parseStackOffset() ([]Node, error) {
 	}
 
 	// +
-	plus := consume(compile.Add)
+	plus := consume(Add)
 	// -
-	minus := consume(compile.Sub)
+	minus := consume(Sub)
 	if plus != nil && minus != nil {
 		return nil, fmt.Errorf("syntax err")
 	}
 
 	// diff
-	diff, err := expect(compile.Integer)
+	diff, err := expect(Integer)
 	if err != nil {
 		return nil, err
 	}
 
 	// ]
-	if _, err := expect(compile.Rcb); err != nil {
+	if _, err := expect(Rcb); err != nil {
 		return nil, err
 	}
 
@@ -254,17 +242,42 @@ func parseStackOffset() ([]Node, error) {
 	return []Node{Offset{reg, v}}, nil
 }
 
-func Parse(token *compile.Token) ([]Node, error) {
+func parseLabel() ([]Node, error) {
+	// id
+	id, err := expect(Identifier)
+	if err != nil {
+		return nil, err
+	}
+
+	// :
+	var define = false
+	if t := consume(Colon); t != nil {
+		define = true
+	}
+
+	return []Node{Label{define, string(id.Raw)}}, nil
+}
+
+func parseDirective() ([]Node, error) {
+	if _, err := expect(Dot); err != nil {
+		return nil, err
+	}
+	return nil, nil
+}
+
+func Parse(token *Token) ([]Node, error) {
 	var nodes []Node
 	curt = token
 loop:
 	for {
 		switch curt.Kind {
-		case compile.Eof:
+		case Eof:
 			break loop
-		case compile.Comment:
+		case Comment:
 			curt = curt.Next
-		case compile.Identifier:
+		case Dot:
+
+		case Identifier:
 			if op, yes := isOperation(string(curt.Raw)); yes {
 				nodes = append(nodes, op)
 				curt = curt.Next
@@ -275,28 +288,26 @@ loop:
 				curt = curt.Next
 				continue
 			}
-			return nil, fmt.Errorf("parse: unsupported ident: %s", string(curt.Raw))
-		case compile.Integer:
+			nds, err := parseLabel()
+			if err != nil {
+				return nil, err
+			}
+			nodes = append(nodes, nds...)
+		case Integer:
 			v, err := curt.GetValueAsInteger()
 			if err != nil {
 				return nil, err
 			}
 			nodes = append(nodes, Number(v))
 			curt = curt.Next
-		case compile.Char:
+		case Char:
 			v, err := curt.GetValueAsRune()
 			if err != nil {
 				return nil, err
 			}
 			nodes = append(nodes, Character(v))
 			curt = curt.Next
-		case compile.Lrb:
-			nds, err := parsePcOffset()
-			if err != nil {
-				return nil, err
-			}
-			nodes = append(nodes, nds...)
-		case compile.Lcb:
+		case Lcb:
 			nds, err := parseStackOffset()
 			if err != nil {
 				return nil, err

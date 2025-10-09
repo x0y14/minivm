@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/urfave/cli/v3"
+	"github.com/x0y14/minivm/bytecode"
 	"github.com/x0y14/minivm/compile"
-	bytecode2 "github.com/x0y14/minivm/compile/bytecode"
 	"github.com/x0y14/minivm/vm"
 )
 
@@ -77,12 +77,12 @@ func main() {
 						return err
 					}
 					// parse
-					nodes, err := bytecode2.Parse(tokens)
+					nodes, err := bytecode.Parse(tokens)
 					if err != nil {
 						return err
 					}
 					// gen code
-					codes, err := bytecode2.Gen(nodes)
+					codes, err := bytecode.Gen(nodes)
 					if err != nil {
 						return err
 					}
