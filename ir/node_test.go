@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/x0y14/minivm/compile"
 )
 
 func TestParse_Basic(t *testing.T) {
@@ -13,7 +12,7 @@ mov r0 1
 add r1 r0
 push 'a'
 `
-	toks, err := compile.Tokenize([]rune(input))
+	toks, err := Tokenize([]rune(input))
 	if err != nil {
 		t.Fatalf("tokenize error: %v", err)
 	}
@@ -75,7 +74,7 @@ func TestParse_Offsets(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			toks, err := compile.Tokenize([]rune(tt.input))
+			toks, err := Tokenize([]rune(tt.input))
 			if err != nil {
 				t.Fatalf("tokenize error: %v", err)
 			}
@@ -92,7 +91,7 @@ func TestParse_Offsets(t *testing.T) {
 
 func TestParse_SkipComment(t *testing.T) {
 	input := "mov r0 1 ; comment\nadd r0 2"
-	toks, err := compile.Tokenize([]rune(input))
+	toks, err := Tokenize([]rune(input))
 	if err != nil {
 		t.Fatalf("tokenize error: %v", err)
 	}
@@ -111,7 +110,7 @@ func TestParse_SkipComment(t *testing.T) {
 
 func TestParse_Error_StackOffset_UnsupportedRegister(t *testing.T) {
 	input := "[hp+1]"
-	toks, err := compile.Tokenize([]rune(input))
+	toks, err := Tokenize([]rune(input))
 	if err != nil {
 		t.Fatalf("tokenize error: %v", err)
 	}

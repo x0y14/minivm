@@ -9,7 +9,6 @@ import (
 
 	"github.com/urfave/cli/v3"
 	"github.com/x0y14/minivm/bytecode"
-	"github.com/x0y14/minivm/compile"
 	"github.com/x0y14/minivm/vm"
 )
 
@@ -72,7 +71,7 @@ func main() {
 						return err
 					}
 					// tokenize
-					tokens, err := compile.Tokenize([]rune(assembly))
+					tokens, err := bytecode.Tokenize([]rune(assembly))
 					if err != nil {
 						return err
 					}
