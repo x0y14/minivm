@@ -1,0 +1,33 @@
+.export _add
+.export _sub
+.export _mul
+
+.section .text:
+; add: r0 = r1 + r2
+_add:
+    mov r0 r1
+    add r0 r2
+    jmp _lib_ret
+
+; sub: r0 = r1 - r2
+_sub:
+    mov r0 r1
+    sub r0 r2
+    jmp _lib_ret
+
+; mul: r0 = r1 * r2  (繰り返し加算の簡易実装)
+_mul:
+    mov r0 0        ; result = 0
+    mov r3 r2       ; counter = r2
+_mul_loop:
+    eq r3 0
+    jz _mul_done
+    add r0 r1
+    sub r3 1
+    jmp _mul_loop
+_mul_done:
+    jmp _lib_ret
+
+; ライブラリ共通の戻りプレースホルダ
+_lib_ret:
+    ; return placeholder
