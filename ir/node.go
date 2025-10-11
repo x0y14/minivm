@@ -76,6 +76,10 @@ func (i Instruction) String() string {
 	return fmt.Sprintf("Instruction{ Op: %s, Args: [ %s ] }", i.Op.String(), strings.Join(elms, ", "))
 }
 
+func (i Instruction) Nodes() []Node {
+	return append([]Node{i.Op}, i.Args...)
+}
+
 // Register `[sp+1]`の `sp`部分
 type Register int
 
@@ -451,8 +455,9 @@ func parseConstants() (map[string]Constant, error) {
 }
 
 func parseEntryPoint() (string, error) {
+	// エントリーポイントなかった
 	if err := expectIdent("global"); err != nil {
-		return "", err
+		return "", nil
 	}
 	id, err := expect(Identifier)
 	if err != nil {
