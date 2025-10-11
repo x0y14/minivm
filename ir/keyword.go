@@ -1,4 +1,4 @@
-package asm
+package ir
 
 func isOperation(ident string) (Operation, bool) {
 	switch ident {

@@ -1,4 +1,4 @@
-package asm
+package ir
 
 import (
 	"math/rand"
@@ -94,7 +94,7 @@ func TestTokenize_RoundTrip(t *testing.T) {
 	}
 
 	corpus := []string{"(", ")", ";hi", "()", "(;x)", "", "\n", "((()))", "123", "-123", "+9-12098*898123",
-		"123.id;comment"}
+		"123.id;comment", `"hello"`}
 
 	cfg := &quick.Config{
 		MaxCount: 300,

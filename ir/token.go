@@ -1,4 +1,4 @@
-package asm
+package ir
 
 import (
 	"fmt"
@@ -23,6 +23,7 @@ const (
 
 	Identifier
 	Integer
+	String
 	Char
 
 	Lrb // (
@@ -46,6 +47,7 @@ func (tk TokenKind) String() string {
 		Comment:    "Comment",
 		Identifier: "Identifier",
 		Integer:    "Integer",
+		String:     "String",
 		Char:       "Char",
 		Lrb:        "(",
 		Rrb:        ")",
@@ -134,6 +136,62 @@ func integer() (*Token, error) {
 		loc.atInLine++
 	}
 	tok.Raw = []rune(v)
+	return &tok, nil
+}
+
+func tokenizeString() (*Token, error) {
+	tok := Token{Kind: String, Position: Position{loc.atInLine, loc.line}}
+	// 開始の `"`
+	if loc.at >= len(text) || text[loc.at] != '"' {
+		return nil, fmt.Errorf("tokenizeString: expected '\"'")
+	}
+	loc.at++
+	loc.atInLine++
+
+	var out []rune
+	for loc.at < len(text) {
+		r := text[loc.at]
+		// 終端の `"`
+		if r == '"' {
+			loc.at++
+			loc.atInLine++
+			tok.Raw = out
+			return &tok, nil
+		}
+		// エスケープ
+		if r == '\\' {
+			loc.at++
+			if loc.at >= len(text) {
+				return nil, fmt.Errorf("unterminated escape in string")
+			}
+			e := text[loc.at]
+			switch e {
+			case 'n':
+				out = append(out, '\n')
+			case 't':
+				out = append(out, '\t')
+			case 'r':
+				out = append(out, '\r')
+			case '\\':
+				out = append(out, '\\')
+			case '"':
+				out = append(out, '"')
+			default:
+				return nil, fmt.Errorf("unsupported escape: \\%c", e)
+			}
+			loc.at++
+			loc.atInLine++
+			continue
+		}
+		// 改行が現れたら未終了エラー
+		if r == '\n' {
+			return nil, fmt.Errorf("unterminated string literal")
+		}
+		out = append(out, r)
+		loc.at++
+		loc.atInLine++
+	}
+	tok.Raw = out
 	return &tok, nil
 }
 
@@ -247,6 +305,13 @@ func Tokenize(input []rune) (*Token, error) {
 			curt = curt.Next
 		case isNumeric(r):
 			tok, err := integer()
+			if err != nil {
+				return nil, err
+			}
+			curt.Next = tok
+			curt = curt.Next
+		case r == '"':
+			tok, err := tokenizeString()
 			if err != nil {
 				return nil, err
 			}
