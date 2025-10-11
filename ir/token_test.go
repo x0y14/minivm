@@ -69,7 +69,7 @@ _start:
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tok, err := Tokenize([]rune(tt.input))
+			tok, err := Tokenize([]rune(tt.input), false)
 			if err != nil {
 				t.Error(err)
 			}
@@ -82,7 +82,7 @@ _start:
 
 func TestTokenize_RoundTrip(t *testing.T) {
 	f := func(s string) bool {
-		tokens, err := Tokenize([]rune(s))
+		tokens, err := Tokenize([]rune(s), false)
 		if err != nil {
 			return false
 		}

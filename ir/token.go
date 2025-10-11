@@ -267,7 +267,7 @@ func char() (*Token, error) {
 	return &tok, nil
 }
 
-func Tokenize(input []rune) (*Token, error) {
+func Tokenize(input []rune, clean bool) (*Token, error) {
 	text = input
 	loc = location{0, 0, 0}
 	head := &Token{}
@@ -287,8 +287,10 @@ func Tokenize(input []rune) (*Token, error) {
 			if err != nil {
 				return nil, err
 			}
-			curt.Next = tok
-			curt = curt.Next
+			if !clean {
+				curt.Next = tok
+				curt = curt.Next
+			}
 		case r == '\'':
 			tok, err := char()
 			if err != nil {
