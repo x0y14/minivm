@@ -1,11 +1,11 @@
 .import printf
 .export _print_fizz
 
-.data:
+.section .data:
     msg auto "hello"
     arr auto 10, 20, 30
 
-.text:
+.section .text:
     global _start
 
 _start:

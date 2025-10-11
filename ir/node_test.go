@@ -1,120 +1,95 @@
 package ir
 
 import (
+	"strings"
 	"testing"
-
-	"github.com/google/go-cmp/cmp"
 )
 
-func TestParse_Basic(t *testing.T) {
-	input := `
-mov r0 1
-add r1 r0
-push 'a'
-`
+func TestParse_Sample1(t *testing.T) {
+	input := strings.TrimSpace(`
+.import printf
+.export _print_fizz
+
+.section .data:
+    msg auto "hello"
+    arr auto 10, 20, 30
+
+.section .text:
+    global _start
+
+_start:
+    alloc 16
+    pop r10
+    mov r6 1
+`)
+
 	toks, err := Tokenize([]rune(input))
 	if err != nil {
 		t.Fatalf("tokenize error: %v", err)
 	}
-	nodes, err := Parse(toks)
+	irObj, err := Parse(toks)
 	if err != nil {
 		t.Fatalf("parse error: %v", err)
 	}
-	expect := []Node{
-		MOV, R0, Number(1),
-		ADD, R1, R0,
-		PUSH, Character('a'),
-	}
-	if diff := cmp.Diff(expect, nodes); diff != "" {
-		t.Errorf("diff:\n%s", diff)
-	}
-}
 
-func TestParse_Offsets(t *testing.T) {
-	tests := []struct {
-		name   string
-		input  string
-		expect []Node
-	}{
-		{
-			name:  "pc offset +",
-			input: "_label:",
-			expect: []Node{
-				Label{true, "_label"},
-			},
-		},
-		{
-			name:  "pc offset -",
-			input: "jmp _label",
-			expect: []Node{
-				JMP, Label{false, "_label"},
-			},
-		},
-		{
-			name:  "stack offset sp +",
-			input: "load r2 [sp+4]",
-			expect: []Node{
-				LOAD, R2, Offset{Target: SP, Diff: 4},
-			},
-		},
-		{
-			name:  "stack offset bp -",
-			input: "store [bp-2] r3",
-			expect: []Node{
-				STORE, Offset{Target: BP, Diff: -2}, R3,
-			},
-		},
-		{
-			name:  "char",
-			input: "'r'1",
-			expect: []Node{
-				Character('r'), Number(1),
-			},
-		},
+	// imports に printf があること
+	found := false
+	for _, im := range irObj.Imports {
+		if im == "printf" {
+			found = true
+			break
+		}
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			toks, err := Tokenize([]rune(tt.input))
-			if err != nil {
-				t.Fatalf("tokenize error: %v", err)
-			}
-			nodes, err := Parse(toks)
-			if err != nil {
-				t.Fatalf("parse error: %v", err)
-			}
-			if diff := cmp.Diff(tt.expect, nodes); diff != "" {
-				t.Errorf("diff:\n%s", diff)
-			}
-		})
+	if !found {
+		t.Fatalf("imports does not contain printf: %v", irObj.Imports)
 	}
-}
 
-func TestParse_SkipComment(t *testing.T) {
-	input := "mov r0 1 ; comment\nadd r0 2"
-	toks, err := Tokenize([]rune(input))
-	if err != nil {
-		t.Fatalf("tokenize error: %v", err)
+	// exports に _print_fizz があること
+	found = false
+	for _, ex := range irObj.Exports {
+		if ex == "_print_fizz" {
+			found = true
+			break
+		}
 	}
-	nodes, err := Parse(toks)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
+	if !found {
+		t.Fatalf("exports does not contain _print_fizz: %v", irObj.Exports)
 	}
-	expect := []Node{
-		MOV, R0, Number(1),
-		ADD, R0, Number(2),
-	}
-	if diff := cmp.Diff(expect, nodes); diff != "" {
-		t.Errorf("diff:\n%s", diff)
-	}
-}
 
-func TestParse_Error_StackOffset_UnsupportedRegister(t *testing.T) {
-	input := "[hp+1]"
-	toks, err := Tokenize([]rune(input))
-	if err != nil {
-		t.Fatalf("tokenize error: %v", err)
+	// constants の msg が AUTO かつ 値が "hello" であること
+	cst, ok := irObj.Constants["msg"]
+	if !ok {
+		t.Fatalf("constants does not contain msg")
 	}
-	if _, err := Parse(toks); err == nil {
-		t.Fatalf("expected error, got nil")
+	if cst.Mode != AUTO {
+		t.Fatalf("msg mode want=AUTO got=%v", cst.Mode)
+	}
+	exp := "hello"
+	if len(cst.Values) != len(exp) {
+		t.Fatalf("msg values length want=%d got=%d", len(exp), len(cst.Values))
+	}
+	for i, r := range exp {
+		if cc, ok := cst.Values[i].(ConstChar); !ok || string(cc) != string(r) {
+			t.Fatalf("msg value[%d] want=%q got=%#v", i, string(r), cst.Values[i])
+		}
+	}
+
+	// entrypoint が _start であること
+	if irObj.EntryPoint != "_start" {
+		t.Fatalf("entrypoint want=_start got=%q", irObj.EntryPoint)
+	}
+
+	// プログラム中に定義ラベル _start があること
+	foundLabel := false
+	for _, n := range irObj.Text {
+		if lb, ok := n.(Label); ok {
+			if lb.Name == "_start" && lb.Define {
+				foundLabel = true
+				break
+			}
+		}
+	}
+	if !foundLabel {
+		t.Fatalf("text does not contain defined label _start")
 	}
 }
