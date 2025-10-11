@@ -12,6 +12,7 @@ func TestParse_Sample1(t *testing.T) {
 
 .section .data:
     msg auto "hello"
+	msgLen sizeof msg
     arr auto 10, 20, 30
 
 .section .text:

@@ -321,6 +321,7 @@ type DataMode int
 
 const (
 	AUTO DataMode = iota
+	SIZEOF
 )
 
 type ConstantData interface {
@@ -346,6 +347,7 @@ type Constant struct {
 	Name   string
 	Mode   DataMode
 	Values []ConstantData
+	Ref    string
 }
 
 type IR struct {
@@ -414,25 +416,36 @@ func parseConstants() (map[string]Constant, error) {
 		}
 
 		// auto, ...
-		var mode DataMode
 		switch {
 		case consumeIdent("auto") != nil:
-			mode = AUTO
+			// "hello", 10,10,10, 'h','i', ...
+			arr, err := parseArray()
+			if err != nil {
+				return nil, err
+			}
+
+			constants[string(id.Raw)] = Constant{
+				Name:   string(id.Raw),
+				Mode:   AUTO,
+				Values: arr,
+				Ref:    "",
+			}
+		case consumeIdent("sizeof") != nil:
+			ref, err := expect(Identifier)
+			if err != nil {
+				return nil, err
+			}
+
+			constants[string(id.Raw)] = Constant{
+				Name:   string(id.Raw),
+				Mode:   SIZEOF,
+				Values: nil,
+				Ref:    string(ref.Raw),
+			}
 		default:
 			return nil, fmt.Errorf("unsupported data mode: %s", curt.Kind.String())
 		}
 
-		// "hello", 10,10,10, 'h','i', ...
-		arr, err := parseArray()
-		if err != nil {
-			return nil, err
-		}
-
-		constants[string(id.Raw)] = Constant{
-			Name:   string(id.Raw),
-			Mode:   mode,
-			Values: arr,
-		}
 	}
 	return constants, nil
 }
