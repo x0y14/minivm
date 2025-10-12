@@ -60,10 +60,10 @@ _start:
 	}
 
 	// constants の msg が AUTO かつ 値が "hello" であること
-	cst, ok := irObj.Constants["msg"]
-	if !ok {
-		t.Fatalf("constants does not contain msg")
+	if len(irObj.Constants) < 1 {
+		t.Fatalf("constants want=1, got=0")
 	}
+	cst := irObj.Constants[0]
 	if cst.Mode != AUTO {
 		t.Fatalf("msg mode want=AUTO got=%v", cst.Mode)
 	}
@@ -95,19 +95,6 @@ _start:
 	if !foundLabel {
 		t.Fatalf("text does not contain defined label _start")
 	}
-}
-
-func expand(nodes []Node) []Node {
-	var nds []Node
-	for _, n := range nodes {
-		switch n := n.(type) {
-		case Instruction:
-			nds = append(nds, n.Nodes()...)
-		default:
-			nds = append(nds, n)
-		}
-	}
-	return nds
 }
 
 func TestParse_Calc(t *testing.T) {
@@ -155,32 +142,32 @@ _lib_ret:
 			&IR{
 				Imports:    []string{},
 				Exports:    []string{"_add", "_sub", "_mul"},
-				Constants:  map[string]Constant{},
+				Constants:  []Constant{},
 				EntryPoint: "",
 				Text: expand([]Node{
 					Label{Define: true, Name: "_add"},
 					Instruction{Op: MOV, Args: []Node{R0, R1}},
 					Instruction{Op: ADD, Args: []Node{R0, R2}},
-					Instruction{Op: JMP, Args: []Node{Label{Define: false, Name: "_lib_ret"}}},
+					Instruction{Op: JMP, Args: []Node{Offset{PC, 35}}},
 
 					Label{Define: true, Name: "_sub"},
 					Instruction{Op: MOV, Args: []Node{R0, R1}},
 					Instruction{Op: SUB, Args: []Node{R0, R2}},
-					Instruction{Op: JMP, Args: []Node{Label{Define: false, Name: "_lib_ret"}}},
+					Instruction{Op: JMP, Args: []Node{Offset{PC, 26}}},
 
 					Label{Define: true, Name: "_mul"},
 					Instruction{Op: MOV, Args: []Node{R0, Number(0)}},
 					Instruction{Op: MOV, Args: []Node{R3, R2}},
-					Label{Define: true, Name: "_mul_loop"},
+					NOP,
 					Instruction{Op: EQ, Args: []Node{R3, Number(0)}},
-					Instruction{Op: JZ, Args: []Node{Label{Define: false, Name: "_mul_done"}}},
+					Instruction{Op: JZ, Args: []Node{Offset{PC, 10}}},
 					Instruction{Op: ADD, Args: []Node{R0, R1}},
 					Instruction{Op: SUB, Args: []Node{R3, Number(1)}},
-					Instruction{Op: JMP, Args: []Node{Label{Define: false, Name: "_mul_loop"}}},
-					Label{Define: true, Name: "_mul_done"},
-					Instruction{Op: JMP, Args: []Node{Label{Define: false, Name: "_lib_ret"}}},
+					Instruction{Op: JMP, Args: []Node{Offset{PC, -12}}},
+					NOP,
+					Instruction{Op: JMP, Args: []Node{Offset{PC, 2}}},
 
-					Label{Define: true, Name: "_lib_ret"},
+					NOP,
 				}),
 			},
 		},
@@ -218,7 +205,7 @@ _after_mul:
 			&IR{
 				Imports:    []string{"add", "sub", "mul"},
 				Exports:    []string{},
-				Constants:  map[string]Constant{},
+				Constants:  []Constant{},
 				EntryPoint: "_start",
 				Text: expand([]Node{
 					Label{Define: true, Name: "_start"},
@@ -226,19 +213,19 @@ _after_mul:
 					Instruction{Op: MOV, Args: []Node{R2, Number(2)}},
 					Instruction{Op: JMP, Args: []Node{Label{Define: false, Name: "_add"}}},
 
-					Label{Define: true, Name: "_after_add"},
+					NOP,
 					Instruction{Op: MOV, Args: []Node{R3, R0}},
 
 					Instruction{Op: MOV, Args: []Node{R1, Number(4)}},
 					Instruction{Op: MOV, Args: []Node{R2, Number(3)}},
 					Instruction{Op: JMP, Args: []Node{Label{Define: false, Name: "_sub"}}},
 
-					Label{Define: true, Name: "_after_sub"},
+					NOP,
 					Instruction{Op: MOV, Args: []Node{R2, R0}},
 					Instruction{Op: MOV, Args: []Node{R1, R3}},
 					Instruction{Op: JMP, Args: []Node{Label{Define: false, Name: "_mul"}}},
 
-					Label{Define: true, Name: "_after_mul"},
+					NOP,
 					Instruction{Op: MOV, Args: []Node{R1, R0}},
 					Instruction{Op: MOV, Args: []Node{R0, Number(0)}},
 					Instruction{Op: SYSCALL, Args: []Node{}},
