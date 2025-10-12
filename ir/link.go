@@ -65,36 +65,47 @@ func merge(dst, src *IR) (*IR, error) {
 }
 
 func solveData(ir *IR) ([]Node, error) {
-	// constantの順番でheapの位置が解決できるはず
-	var pre []Node
-	var result []Node
+	// 1) データ定数(AUTO)の基底アドレスを計算してマップ化
+	addr := make(map[string]int)
 	hp := 0
 	for _, c := range ir.Constants {
-		// heap位置をラベルと置換
-		for _, nd := range ir.Text {
-			switch nd := nd.(type) {
-			case Label:
-				if !nd.Define && nd.Name == c.Name {
-					result = append(result, Number(hp))
-				} else {
-					result = append(result, nd)
-				}
-			default:
-				result = append(result, nd)
+		if c.Mode != AUTO {
+			continue
+		}
+		addr[c.Name] = hp
+		hp += len(c.Values)
+	}
+
+	// 2) ir.Text を一度だけ走査し、該当 Label を Number(アドレス) に置換
+	result := make([]Node, 0, len(ir.Text))
+	for _, nd := range ir.Text {
+		if lb, ok := nd.(Label); ok && !lb.Define {
+			if a, ok := addr[lb.Name]; ok {
+				result = append(result, Number(a))
+				continue
 			}
 		}
-		// preで使用するデータの作成
+		result = append(result, nd)
+	}
+	ir.Text = result
+
+	// 3) プリスクリプト生成（ヒープ確保と各定数値の格納）
+	pre := make([]Node, 0)
+	for _, c := range ir.Constants {
+		if c.Mode != AUTO {
+			continue
+		}
+		base := addr[c.Name]
+		// 長さ分を確保して捨てレジスタにPOP（既存仕様を踏襲）
 		pre = append(pre, ALLOC, Number(len(c.Values)), POP, R10)
 		for i, v := range c.Values {
 			switch v := v.(type) {
 			case ConstChar:
-				pre = append(pre, STORE, Number(hp+i), Character(v))
+				pre = append(pre, STORE, Number(base+i), Character(v))
 			case ConstInt:
-				pre = append(pre, STORE, Number(hp+i), Number(v))
+				pre = append(pre, STORE, Number(base+i), Number(v))
 			}
 		}
-
-		hp += len(c.Values)
 	}
 	return pre, nil
 }
