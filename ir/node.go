@@ -159,6 +159,9 @@ type Offset struct {
 
 func (o Offset) isNode() {}
 func (o Offset) String() string {
+	if o.Target == PC {
+		return fmt.Sprintf("(%+d)", o.Diff)
+	}
 	return fmt.Sprintf("[%s%+d]", o.Target.String(), o.Diff)
 }
 
