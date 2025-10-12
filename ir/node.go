@@ -467,6 +467,53 @@ func parseEntryPoint() (string, error) {
 	return string(id.Raw), nil
 }
 
+func solveLabel(exports []string, nodes []Node) ([]Node, error) {
+	var preResult []Node
+	labelLocations := map[string]int{}
+	// ラベル定義の位置だけ全て取得する
+	for pc, nd := range nodes {
+		label, ok := nd.(Label)
+		// ラベルでなければそのまま
+		if !ok {
+			preResult = append(preResult, nd)
+			continue
+		}
+		// 定義かつexportされていなかったら
+		if label.Define && !in(label.Name, exports) {
+			labelLocations[label.Name] = pc
+			// 無操作と入れ替える
+			preResult = append(preResult, NOP)
+			continue
+		} else {
+			// そのまま
+			preResult = append(preResult, nd)
+			continue
+		}
+	}
+
+	var result []Node
+	for pc, nd := range preResult {
+		label, ok := nd.(Label)
+		// ラベルでなければそのまま
+		if !ok {
+			result = append(result, nd)
+			continue
+		}
+		// ラベル呼び出し かつ 場所が記録されている
+		dst, ok := labelLocations[label.Name]
+		if !label.Define && ok {
+			// pc-1なのはjmpなどのOPが基準になるから
+			result = append(result, Offset{PC, dst - (pc - 1)})
+			continue
+		} else {
+			result = append(result, nd)
+			continue
+		}
+	}
+
+	return result, nil
+}
+
 func Parse(token *Token) (*IR, error) {
 	ir := IR{}
 	ir.Imports = make([]string, 0)
