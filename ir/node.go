@@ -350,8 +350,8 @@ func (c ConstInt) String() string {
 type Constant struct {
 	Name   string
 	Mode   DataMode
-	Values []ConstantData
-	Ref    string
+	Values []ConstantData // msg auto "hello" <- "hello"
+	Ref    string         // msg sizeof ref <- ref
 }
 
 type IR struct {
