@@ -1,0 +1,127 @@
+.section .data:
+    ; number buffer as separate one-byte constants so テキスト中から個別に更新できる
+    num0 auto "0"
+    num1 auto "0"
+    num2 auto "1"
+    num3 auto "\n"
+
+    fizz auto "Fizz\n"
+    buzz auto "Buzz\n"
+    fizzbuzz auto "FizzBuzz\n"
+
+.section .text:
+    global _start
+
+_start:
+    ; r5 = current number (1..100)
+    mov r5 1
+    ; r7 = counter mod3, r8 = counter mod5
+    mov r7 0
+    mov r8 0
+
+loop_start:
+    ; --- update mod3 ---
+    add r7 1
+    eq r7 3
+    jz reset_mod3
+    mov r9 0        ; fizzFlag = 0
+    jmp after_mod3
+reset_mod3:
+    mov r7 0
+    mov r9 1        ; fizzFlag = 1
+after_mod3:
+
+    ; --- update mod5 ---
+    add r8 1
+    eq r8 5
+    jz reset_mod5
+    mov r10 0       ; buzzFlag = 0
+    jmp after_mod5
+reset_mod5:
+    mov r8 0
+    mov r10 1       ; buzzFlag = 1
+after_mod5:
+
+    ; decide what to print
+    mov r4 r9
+    add r4 r10      ; r4 = fizzFlag + buzzFlag
+    eq r4 2
+    jz print_fizzbuzz
+    eq r4 1
+    jz print_fizz_or_buzz
+
+print_number:
+    ; print zero-padded 3-digit number + newline at num0 (num0,num1,num2,num3)
+    mov r1 1
+    mov r2 num0
+    mov r3 4
+    mov r0 1
+    syscall
+    jmp after_print
+
+print_fizz_or_buzz:
+    eq r9 1
+    jz print_fizz
+    ; else buzz
+print_buzz:
+    mov r1 1
+    mov r2 buzz
+    mov r3 5
+    mov r0 1
+    syscall
+    jmp after_print
+print_fizz:
+    mov r1 1
+    mov r2 fizz
+    mov r3 5
+    mov r0 1
+    syscall
+    jmp after_print
+
+print_fizzbuzz:
+    mov r1 1
+    mov r2 fizzbuzz
+    mov r3 9
+    mov r0 1
+    syscall
+
+after_print:
+    ; --- increment number buffer stored in heap as num2 (ones), num1 (tens), num0 (hundreds) ---
+    ; load num2 -> r1, add 1, if overflow ('9'+1 => 58) carry else store back
+    load num2 r1
+    add r1 1
+    eq r1 58
+    jz carry_ones
+    store num2 r1
+    jmp cont_inc
+carry_ones:
+    mov r1 48        ; '0'
+    store num2 r1
+    ; carry to tens
+    load num1 r1
+    add r1 1
+    eq r1 58
+    jz carry_tens
+    store num1 r1
+    jmp cont_inc
+carry_tens:
+    mov r1 48
+    store num1 r1
+    ; carry to hundreds (no wrap for 100)
+    load num0 r1
+    add r1 1
+    store num0 r1
+
+cont_inc:
+    ; increment loop counter
+    add r5 1
+    ; stop when r5 == 101
+    eq r5 101
+    jz program_done
+    jmp loop_start
+
+program_done:
+    ; exit syscall (R0=0, R1=status)
+    mov r1 0
+    mov r0 0
+    syscall
