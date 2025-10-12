@@ -355,6 +355,7 @@ type Constant struct {
 }
 
 type IR struct {
+	Id         string
 	Imports    []string
 	Exports    []string
 	Constants  map[string]Constant
