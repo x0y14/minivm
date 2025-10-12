@@ -358,7 +358,7 @@ type IR struct {
 	Id         string
 	Imports    []string
 	Exports    []string
-	Constants  map[string]Constant
+	Constants  []Constant
 	EntryPoint string
 	Text       []Node
 }
@@ -411,8 +411,8 @@ func parseArray() ([]ConstantData, error) {
 
 	return arr, nil
 }
-func parseConstants() (map[string]Constant, error) {
-	constants := map[string]Constant{}
+func parseConstants() ([]Constant, error) {
+	var constants []Constant
 	for curt.Kind != Eof {
 		// msg, arr, ...
 		id := consume(Identifier)
@@ -429,24 +429,24 @@ func parseConstants() (map[string]Constant, error) {
 				return nil, err
 			}
 
-			constants[string(id.Raw)] = Constant{
+			constants = append(constants, Constant{
 				Name:   string(id.Raw),
 				Mode:   AUTO,
 				Values: arr,
 				Ref:    "",
-			}
+			})
 		case consumeIdent("sizeof") != nil:
 			ref, err := expect(Identifier)
 			if err != nil {
 				return nil, err
 			}
 
-			constants[string(id.Raw)] = Constant{
+			constants = append(constants, Constant{
 				Name:   string(id.Raw),
 				Mode:   SIZEOF,
 				Values: nil,
 				Ref:    string(ref.Raw),
-			}
+			})
 		default:
 			return nil, fmt.Errorf("unsupported data mode: %s", curt.Kind.String())
 		}
@@ -471,7 +471,7 @@ func Parse(token *Token) (*IR, error) {
 	ir := IR{}
 	ir.Imports = make([]string, 0)
 	ir.Exports = make([]string, 0)
-	ir.Constants = make(map[string]Constant)
+	ir.Constants = make([]Constant, 0)
 	ir.EntryPoint = ""
 	ir.Text = make([]Node, 0)
 
@@ -530,6 +530,14 @@ loop:
 			}
 		default:
 			program, err := parseText()
+			if err != nil {
+				return nil, err
+			}
+			exports := ir.Exports
+			if ir.EntryPoint != "" {
+				exports = append(exports, ir.EntryPoint)
+			}
+			program, err = solveLabel(exports, expand(program))
 			if err != nil {
 				return nil, err
 			}
