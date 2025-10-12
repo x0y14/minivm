@@ -71,3 +71,9 @@ $ go run ./cmd/minivm/main.go run -stack 32768 -heap 131072 ./examples/bytecode/
 | 0    | exit  | R1: status                   | プログラムを終了する際に使用 |
 | 1    | write | R1: fd, R2: addr, R3: length | バッファ書き込み       |
 | 2    | read  | R1: fd, R2: addr, R3: length | バッファ読み込み       |
+
+## Linkについて
+
+`_start`はエントリーポイントなので使用しないでください
+
+`__`から始まるラベルはローカルラベルとします

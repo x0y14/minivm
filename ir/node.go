@@ -61,6 +61,30 @@ func (o Operation) String() string {
 	}[o]
 }
 
+func (o Operation) NumOperands() int {
+	return []int{
+		NOP:     0,
+		MOV:     2,
+		PUSH:    1,
+		POP:     1,
+		ALLOC:   1,
+		STORE:   2,
+		LOAD:    2,
+		CALL:    1,
+		RET:     0,
+		JMP:     1,
+		JZ:      1,
+		JNZ:     1,
+		ADD:     2,
+		SUB:     2,
+		EQ:      2,
+		NE:      2,
+		LT:      2,
+		LE:      2,
+		SYSCALL: 0,
+	}[o]
+}
+
 // Instruction `mov dst src`のような命令
 type Instruction struct {
 	Op   Operation
@@ -333,7 +357,7 @@ type ConstantData interface {
 	String() string
 }
 
-type ConstChar string
+type ConstChar rune
 
 func (c ConstChar) isData() {}
 func (c ConstChar) String() string {
@@ -514,6 +538,98 @@ func solveLabel(exports []string, nodes []Node) ([]Node, error) {
 	return result, nil
 }
 
+func solveSizeof(imports []string, constants []Constant, nodes []Node) ([]Constant, []Node, error) {
+	// 定数名 -> Constant マップ
+	cmap := make(map[string]Constant)
+	for _, c := range constants {
+		cmap[c.Name] = c
+	}
+
+	// sizeof を再帰的に解く（循環検出）
+	visited := make(map[string]bool)
+	var sizeOf func(name string) (int, error)
+	sizeOf = func(name string) (int, error) {
+		if visited[name] {
+			return 0, fmt.Errorf("sizeof cyclic ref: %s", name)
+		}
+		c, ok := cmap[name]
+		if !ok {
+			return 0, fmt.Errorf("constant not found: %s", name)
+		}
+		visited[name] = true
+		defer func() { visited[name] = false }()
+
+		switch c.Mode {
+		case AUTO:
+			return len(c.Values), nil
+		case SIZEOF:
+			return sizeOf(c.Ref)
+		default:
+			return 0, fmt.Errorf("unsupported data mode for sizeof: %s", name)
+		}
+	}
+
+	// newConstant は元のコピー。解決済み SIZEOF 定数を後で除外する。
+	newConstant := make([]Constant, len(constants))
+	copy(newConstant, constants)
+
+	// 解決された SIZEOF 定数名のセット
+	resolvedSizeof := make(map[string]bool)
+
+	var result []Node
+	for _, n := range nodes {
+		switch v := n.(type) {
+		case Label:
+			// 定義ラベルは置換しない。参照ラベルで sizeof 定数があれば置換。
+			if !v.Define {
+				if c, ok := cmap[v.Name]; ok && c.Mode == SIZEOF && !in(v.Name, imports) {
+					sz, err := sizeOf(c.Ref)
+					if err != nil {
+						return nil, nil, err
+					}
+					result = append(result, Number(sz))
+					resolvedSizeof[v.Name] = true
+					continue
+				}
+			}
+			result = append(result, v)
+		case Instruction:
+			// 引数内の sizeof 参照を置換
+			newArgs := make([]Node, 0, len(v.Args))
+			for _, a := range v.Args {
+				if lb, ok := a.(Label); ok && !lb.Define && !in(lb.Name, imports) {
+					if c, ok := cmap[lb.Name]; ok && c.Mode == SIZEOF {
+						sz, err := sizeOf(c.Ref)
+						if err != nil {
+							return nil, nil, err
+						}
+						newArgs = append(newArgs, Number(sz))
+						resolvedSizeof[lb.Name] = true
+						continue
+					}
+				}
+				newArgs = append(newArgs, a)
+			}
+			result = append(result, Instruction{Op: v.Op, Args: newArgs})
+		default:
+			// その他のノードはそのまま
+			result = append(result, n)
+		}
+	}
+
+	// newConstant から解決済みの SIZEOF 定数を除外
+	filtered := make([]Constant, 0, len(newConstant))
+	for _, c := range newConstant {
+		if c.Mode == SIZEOF && resolvedSizeof[c.Name] {
+			// 除外
+			continue
+		}
+		filtered = append(filtered, c)
+	}
+
+	return filtered, result, nil
+}
+
 func Parse(token *Token) (*IR, error) {
 	ir := IR{}
 	ir.Imports = make([]string, 0)
@@ -588,6 +704,11 @@ loop:
 			if err != nil {
 				return nil, err
 			}
+			newConstants, program, err := solveSizeof(ir.Imports, ir.Constants, expand(program))
+			if err != nil {
+				return nil, err
+			}
+			ir.Constants = newConstants
 			ir.Text = program
 		}
 	}
