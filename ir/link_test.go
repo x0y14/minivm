@@ -1,7 +1,6 @@
 package ir
 
 import (
-	"fmt"
 	"testing"
 )
 
@@ -280,9 +279,8 @@ program_done:
 	if err != nil {
 		t.Fatal(err)
 	}
-	nodes, err := Link([]*IR{ir})
+	_, err = Link([]*IR{ir})
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println(nodes)
 }
