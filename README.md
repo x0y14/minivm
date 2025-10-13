@@ -12,7 +12,10 @@ $ go run ./cmd/minivm/main.go help
 
 run fizzbuzz
 ```shell
+# bytecode
 $ go run ./cmd/minivm/main.go run ./examples/bytecode/fizzbuzz.mbyt
+# ir
+$ go run  ./cmd/minivm/main.go run --link ./examples/ir/fizzbuzz.mir
 ```
 
 brainf*ck
