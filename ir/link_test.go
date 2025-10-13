@@ -2,144 +2,183 @@ package ir
 
 import (
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
-//func containsString(slice []string, s string) bool {
-//	for _, v := range slice {
-//		if v == s {
-//			return true
-//		}
-//	}
-//	return false
-//}
-//
-//func findOffsets(ir *IR) []Offset {
-//	var res []Offset
-//	for _, n := range ir.Text {
-//		if o, ok := n.(Offset); ok {
-//			res = append(res, o)
-//		}
-//		// also check inside Instruction args
-//		if ins, ok := n.(Instruction); ok {
-//			for _, a := range ins.Args {
-//				if o, ok := a.(Offset); ok {
-//					res = append(res, o)
-//				}
-//			}
-//		}
-//	}
-//	return res
-//}
-//
-//func TestLink_MergeRemovesImportAndResolves(t *testing.T) {
-//	// main imports "foo" and jumps to it; lib defines "foo"
-//	main := &IR{
-//		Imports:    []string{"foo"},
-//		Exports:    []string{},
-//		Constants:  []Constant{},
-//		EntryPoint: "_start",
-//		Text: []Node{
-//			Label{Define: true, Name: "_start"},
-//			Instruction{Op: JMP, Args: []Node{Label{Define: false, Name: "foo"}}},
-//		},
-//	}
-//	lib := &IR{
-//		Imports:    []string{},
-//		Exports:    []string{"foo"},
-//		Constants:  []Constant{},
-//		EntryPoint: "",
-//		Text: []Node{
-//			Label{Define: true, Name: "foo"},
-//			NOP,
-//		},
-//	}
-//
-//	res, err := Link([]*IR{main, lib})
-//	if err != nil {
-//		t.Fatalf("unexpected error: %v", err)
-//	}
-//	// import "foo" は解決されていること
-//	if containsString(res.Imports, "foo") {
-//		t.Fatalf("import foo should be removed after linking, got imports=%v", res.Imports)
-//	}
-//	// entrypoint が引き継がれていること
-//	if res.EntryPoint != "_start" {
-//		t.Fatalf("EntryPoint expected _start, got=%q", res.EntryPoint)
-//	}
-//}
-//
-//func TestLink_TooManyEntryPoints(t *testing.T) {
-//	a := &IR{EntryPoint: "_one", Imports: []string{}, Text: []Node{}}
-//	b := &IR{EntryPoint: "_two", Imports: []string{}, Text: []Node{}}
-//	_, err := Link([]*IR{a, b})
-//	if err == nil {
-//		t.Fatalf("expected error when multiple entry points exist")
-//	}
-//	if !strings.Contains(err.Error(), "too many entryPoint") {
-//		t.Fatalf("unexpected error: %v", err)
-//	}
-//}
-//
-//func TestLink_UnsolvedLabel_Error(t *testing.T) {
-//	// 未定義ラベルを参照しているが import でも定義でもない -> エラー
-//	ir := &IR{
-//		Imports:    []string{},
-//		Exports:    []string{},
-//		Constants:  []Constant{},
-//		EntryPoint: "",
-//		Text: []Node{
-//			Label{Define: false, Name: "missing"},
-//		},
-//	}
-//	_, err := Link([]*IR{ir})
-//	if err == nil {
-//		t.Fatalf("expected unsolved label error")
-//	}
-//	if !strings.Contains(err.Error(), "undefined") {
-//		t.Fatalf("unexpected error: %v", err)
-//	}
-//}
-//
-//func TestLink_OffsetAdjustmentOnMerge(t *testing.T) {
-//	// dst has 3 nodes, src has an Offset{PC,5} which should become 5+3=8 after merge
-//	dst := &IR{
-//		Imports:    []string{},
-//		Exports:    []string{},
-//		Constants:  []Constant{},
-//		EntryPoint: "",
-//		Text: []Node{
-//			NOP, NOP, NOP, // length 3
-//		},
-//	}
-//	src := &IR{
-//		Imports:    []string{},
-//		Exports:    []string{},
-//		Constants:  []Constant{},
-//		EntryPoint: "",
-//		Text: []Node{
-//			Offset{Target: PC, Diff: 5},
-//		},
-//	}
-//
-//	res, err := Link([]*IR{dst, src})
-//	if err != nil {
-//		t.Fatalf("unexpected error: %v", err)
-//	}
-//	offs := findOffsets(res)
-//	if len(offs) == 0 {
-//		t.Fatalf("expected at least one Offset in linked IR")
-//	}
-//	found := false
-//	for _, o := range offs {
-//		if o.Target == PC && o.Diff == 8 {
-//			found = true
-//			break
-//		}
-//	}
-//	if !found {
-//		t.Fatalf("expected adjusted Offset with Diff=8, got offsets=%v", offs)
-//	}
-//}
+// AUTO 定数ラベルが load/store のオペランドから除去され、数値になること
+func TestLink_ResolvesAutoDataLabelsInOperands(t *testing.T) {
+	code := `
+.section .data:
+    num auto "A"
+
+.section .text:
+    global _start
+_start:
+    load num r1
+    store num r1
+`
+	tokens, err := Tokenize([]rune(code), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ir, err := Parse(tokens)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := Link([]*IR{ir})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// ラベル num が最終ノード列に存在しないこと
+	for _, n := range nodes {
+		if lb, ok := n.(Label); ok && lb.Name == "num" {
+			t.Fatalf("label %q still remains in linked output", lb.Name)
+		}
+	}
+
+	// load num r1 -> load <number> r1 に解決されていること
+	foundLoad := false
+	foundStore := false
+	for i := 0; i+2 < len(nodes); i++ {
+		if op, ok := nodes[i].(Operation); ok && op == LOAD {
+			if _, ok := nodes[i+1].(Number); ok {
+				if r, ok := nodes[i+2].(Register); ok && r == R1 {
+					foundLoad = true
+				}
+			}
+		}
+		if op, ok := nodes[i].(Operation); ok && op == STORE {
+			if _, ok := nodes[i+1].(Number); ok {
+				if r, ok := nodes[i+2].(Register); ok && r == R1 {
+					foundStore = true
+				}
+			}
+		}
+	}
+	if !foundLoad {
+		t.Fatalf("resolved LOAD <number> r1 not found")
+	}
+	if !foundStore {
+		t.Fatalf("resolved STORE <number> r1 not found")
+	}
+}
+
+// sizeof 定数参照がテキストで数値に解決されること
+func TestLink_ReplacesSizeofInText(t *testing.T) {
+	code := `
+.section .data:
+    arr auto "hi"
+    sz sizeof arr
+
+.section .text:
+    global _start
+_start:
+    mov r1 sz
+`
+	tokens, err := Tokenize([]rune(code), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ir, err := Parse(tokens)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := Link([]*IR{ir})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// mov r1 2 が存在すること（"hi" の長さ）
+	found := false
+	for i := 0; i+2 < len(nodes); i++ {
+		if op, ok := nodes[i].(Operation); ok && op == MOV {
+			if r, ok := nodes[i+1].(Register); ok && r == R1 {
+				if n, ok := nodes[i+2].(Number); ok && int(n) == 2 {
+					found = true
+					break
+				}
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("MOV r1 2 (sizeof resolution) not found in linked output")
+	}
+
+	// ラベル sz が残っていないこと
+	for _, n := range nodes {
+		if lb, ok := n.(Label); ok && lb.Name == "sz" {
+			t.Fatalf("label %q still remains in linked output", lb.Name)
+		}
+	}
+}
+
+// プリスクリプトに ALLOC と STORE が生成されること（AUTO データの初期化）
+func TestLink_GeneratesPreScriptForAutoData(t *testing.T) {
+	code := `
+.section .data:
+    data auto "AB"
+
+.section .text:
+    global _start
+_start:
+    nop
+`
+	tokens, err := Tokenize([]rune(code), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ir, err := Parse(tokens)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := Link([]*IR{ir})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// プリスクリプト中に ALLOC 2, POP r10 があること
+	foundAlloc := false
+	for i := 0; i+3 < len(nodes); i++ {
+		if op, ok := nodes[i].(Operation); ok && op == ALLOC {
+			if n, ok := nodes[i+1].(Number); ok && int(n) == 2 {
+				if op2, ok := nodes[i+2].(Operation); ok && op2 == POP {
+					if r, ok := nodes[i+3].(Register); ok && r == R10 {
+						foundAlloc = true
+						break
+					}
+				}
+			}
+		}
+	}
+	if !foundAlloc {
+		t.Fatalf("pre-script ALLOC 2; POP r10 not found")
+	}
+
+	// data[0]='A', data[1]='B' の STORE があること
+	foundStoreA := false
+	foundStoreB := false
+	for i := 0; i+2 < len(nodes); i++ {
+		if op, ok := nodes[i].(Operation); ok && op == STORE {
+			if base, ok := nodes[i+1].(Number); ok {
+				switch int(base) {
+				case 0:
+					if ch, ok := nodes[i+2].(Character); ok && rune(ch) == 'A' {
+						foundStoreA = true
+					}
+				case 1:
+					if ch, ok := nodes[i+2].(Character); ok && rune(ch) == 'B' {
+						foundStoreB = true
+					}
+				}
+			}
+		}
+	}
+	if !foundStoreA || !foundStoreB {
+		t.Fatalf("pre-script STORE for data bytes not found: A=%v B=%v", foundStoreA, foundStoreB)
+	}
+}
 
 func TestLink_FizzBuzz(t *testing.T) {
 	code := `
@@ -282,5 +321,167 @@ program_done:
 	_, err = Link([]*IR{ir})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestLink_RelativeOffsetCalculation(t *testing.T) {
+	tests := []struct {
+		name   string
+		irs    []*IR
+		expect []Node
+	}{
+		{
+			name: "forward jump",
+			irs: []*IR{
+				{
+					EntryPoint: "_start",
+					Text: expand([]Node{
+						Label{Define: true, Name: "_start"},
+						Instruction{Op: JMP, Args: []Node{Label{Define: false, Name: "_target"}}},
+						NOP,
+						NOP,
+						Label{Define: true, Name: "_target"},
+						Instruction{Op: MOV, Args: []Node{R0, Number(0)}},
+					}),
+				},
+			},
+			expect: []Node{
+				JMP, Offset{PC, 11}, // goto _pre
+				NOP,                // _start
+				JMP, Offset{PC, 4}, // forward +4
+				NOP,
+				NOP,
+				NOP, // _target
+				MOV, R0, Number(0),
+				NOP,                  // _pre
+				JMP, Offset{PC, -10}, // goto _start
+			},
+		},
+		{
+			name: "backward jump",
+			irs: []*IR{
+				{
+					EntryPoint: "_start",
+					Text: expand([]Node{
+						Label{Define: true, Name: "_start"},
+						Label{Define: true, Name: "_loop"},
+						Instruction{Op: SUB, Args: []Node{R1, Number(1)}},
+						Instruction{Op: JNZ, Args: []Node{Label{Define: false, Name: "_loop"}}},
+					}),
+				},
+			},
+			expect: []Node{
+				JMP, Offset{PC, +9}, // goto _pre
+				NOP, // _start
+				NOP, // _loop
+				SUB, R1, Number(1),
+				JNZ, Offset{PC, -4}, // backward -4 (goto _loop)
+				NOP,                 // _pre
+				JMP, Offset{PC, -8}, // goto _start
+			},
+		},
+		{
+			name: "call with offset",
+			irs: []*IR{
+				{
+					EntryPoint: "_start",
+					Text: expand([]Node{
+						Label{Define: true, Name: "_start"},
+						Instruction{Op: CALL, Args: []Node{Label{Define: false, Name: "_func"}}},
+						Instruction{Op: RET, Args: []Node{}},
+						Label{Define: true, Name: "_func"},
+						Instruction{Op: MOV, Args: []Node{R0, Number(42)}},
+						Instruction{Op: RET, Args: []Node{}},
+					}),
+				},
+			},
+			expect: []Node{
+				JMP, Offset{PC, 11}, // goto _pre
+				NOP,                 // _start
+				CALL, Offset{PC, 3}, // goto _func
+				RET,
+				NOP, // _func
+				MOV, R0, Number(42),
+				RET,
+				NOP,                  // _pre
+				JMP, Offset{PC, -10}, // goto _start
+			},
+		},
+		{
+			name: "multiple jumps same target",
+			irs: []*IR{
+				{
+					EntryPoint: "_start",
+					Text: expand([]Node{
+						Label{Define: true, Name: "_start"},
+						Instruction{Op: JMP, Args: []Node{Label{Define: false, Name: "_end"}}},
+						NOP,
+						Instruction{Op: JMP, Args: []Node{Label{Define: false, Name: "_end"}}},
+						NOP,
+						Label{Define: true, Name: "_end"},
+						Instruction{Op: RET, Args: []Node{}},
+					}),
+				},
+			},
+			expect: []Node{
+				JMP, Offset{PC, 11}, // goto _pre
+				NOP,                // _start
+				JMP, Offset{PC, 6}, // goto _end
+				NOP,
+				JMP, Offset{PC, 3}, // goto _end
+				NOP,
+				NOP, // _end
+				RET,
+				NOP,                  // _pre
+				JMP, Offset{PC, -10}, // _start
+			},
+		},
+		{
+			name: "cross-module label reference",
+			irs: []*IR{
+				{
+					Exports:    []string{"_func"},
+					EntryPoint: "",
+					Text: expand([]Node{
+						Label{Define: true, Name: "_func"},
+						Instruction{Op: MOV, Args: []Node{R0, Number(1)}},
+						Instruction{Op: RET, Args: []Node{}},
+					}),
+				},
+				{
+					Imports:    []string{"_func"},
+					EntryPoint: "_start",
+					Text: expand([]Node{
+						Label{Define: true, Name: "_start"},
+						Instruction{Op: CALL, Args: []Node{Label{Define: false, Name: "_func"}}},
+						Instruction{Op: RET, Args: []Node{}},
+					}),
+				},
+			},
+			expect: []Node{
+				JMP, Offset{PC, 11}, // goto _pre
+				NOP, // _func
+				MOV, R0, Number(1),
+				RET,
+				NOP,                  // _start
+				CALL, Offset{PC, -6}, // goto _func
+				RET,
+				NOP,                 // _pre
+				JMP, Offset{PC, -5}, // goto _start
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := Link(tt.irs)
+			if err != nil {
+				t.Fatalf("Link error: %v", err)
+			}
+
+			if diff := cmp.Diff(tt.expect, got); diff != "" {
+				t.Errorf("diff (-want +got):\n%s", diff)
+			}
+		})
 	}
 }

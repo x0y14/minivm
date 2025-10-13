@@ -505,7 +505,7 @@ func solveLabel(exports []string, nodes []Node) ([]Node, error) {
 	var preResult []Node
 	labelLocations := map[string]int{}
 	// ラベル定義の位置だけ全て取得する
-	for pc, nd := range nodes {
+	for _, nd := range nodes {
 		label, ok := nd.(Label)
 		// ラベルでなければそのまま
 		if !ok {
@@ -514,7 +514,7 @@ func solveLabel(exports []string, nodes []Node) ([]Node, error) {
 		}
 		// 定義かつexportされていなかったら
 		if label.Define && !in(label.Name, exports) {
-			labelLocations[label.Name] = pc
+			labelLocations[label.Name] = len(preResult)
 			// 無操作と入れ替える
 			preResult = append(preResult, NOP)
 			continue
@@ -703,6 +703,7 @@ loop:
 			}
 		default:
 			program, err := parseText()
+			program = expand(program)
 			if err != nil {
 				return nil, err
 			}
@@ -710,11 +711,11 @@ loop:
 			if ir.EntryPoint != "" {
 				exports = append(exports, ir.EntryPoint)
 			}
-			program, err = solveLabel(exports, expand(program))
+			program, err = solveLabel(exports, program)
 			if err != nil {
 				return nil, err
 			}
-			newConstants, program, err := solveSizeof(ir.Imports, ir.Constants, expand(program))
+			newConstants, program, err := solveSizeof(ir.Imports, ir.Constants, program)
 			if err != nil {
 				return nil, err
 			}

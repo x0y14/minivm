@@ -5,24 +5,6 @@ import (
 	"strconv"
 )
 
-func adjustNode(n Node) Node {
-	switch v := n.(type) {
-	case Offset:
-		if v.Target == PC {
-			v.Diff += 2
-		}
-		return v
-	case Instruction:
-		newArgs := make([]Node, 0, len(v.Args))
-		for _, a := range v.Args {
-			newArgs = append(newArgs, adjustNode(a))
-		}
-		return Instruction{Op: v.Op, Args: newArgs}
-	default:
-		return n
-	}
-}
-
 func merge(dst, src *IR) (*IR, error) {
 	mergedImports := dst.Imports
 	var mergedText = dst.Text
@@ -219,29 +201,23 @@ func Link(irs []*IR) ([]Node, error) {
 	if err != nil {
 		return nil, err
 	}
+	resultIr.Text = nds
+
 	// 定数解決
 	preScript, err := solveData(resultIr)
 	if err != nil {
 		return nil, err
 	}
 
-	resultIr.Text = nds
-	resultIr.Text = append(resultIr.Text, []Node{
-		Label{Define: true, Name: "_pre"},
-	}...)
+	resultIr.Text = append(resultIr.Text, Label{Define: true, Name: "_pre"})
 	resultIr.Text = append(resultIr.Text, preScript...)
 	resultIr.Text = append(resultIr.Text, JMP, Label{false, "_start"})
-
-	vmEntryPoint, err := solve(resultIr)
+	preLocation, err := solve(resultIr)
 	if err != nil {
 		return nil, err
 	}
-	resultIr.Text = append([]Node{JMP, Number(vmEntryPoint)}, resultIr.Text...)
-	// 全てのラベル位置を+2する
-	adjusted := make([]Node, 0, len(resultIr.Text))
-	for _, nd := range resultIr.Text {
-		adjusted = append(adjusted, adjustNode(nd))
-	}
-
-	return adjusted, nil
+	resultIr.Text = append([]Node{
+		JMP, Offset{PC, preLocation + 2}, // 2 == len(JMP, (...))
+	}, resultIr.Text...)
+	return resultIr.Text, nil
 }
