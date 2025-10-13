@@ -1,9 +1,9 @@
 .section .data:
     ; number buffer as separate one-byte constants so テキスト中から個別に更新できる
-    num0 auto "0"
-    num1 auto "0"
-    num2 auto "1"
-    num3 auto "\n"
+    num0 auto '0'
+    num1 auto '0'
+    num2 auto '0'
+    num3 auto '\n'
 
     fizz auto "Fizz\n"
     buzz auto "Buzz\n"
