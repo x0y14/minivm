@@ -11,6 +11,13 @@ type Node interface {
 	String() string
 }
 
+type Commenting string
+
+func (c Commenting) isNode() {}
+func (c Commenting) String() string {
+	return "; " + string(c)
+}
+
 type Operation int
 
 const (
