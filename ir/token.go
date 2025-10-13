@@ -176,6 +176,8 @@ func tokenizeString() (*Token, error) {
 				out = append(out, '\\')
 			case '"':
 				out = append(out, '"')
+			case '0':
+				out = append(out, 0)
 			default:
 				return nil, fmt.Errorf("unsupported escape: \\%c", e)
 			}
@@ -247,6 +249,8 @@ func char() (*Token, error) {
 			r = '\\'
 		case '\'':
 			r = '\''
+		case '0':
+			r = 0
 		default:
 			return nil, fmt.Errorf("unsupported escape: \\%c", text[loc.at])
 		}

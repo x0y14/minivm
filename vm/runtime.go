@@ -218,28 +218,40 @@ func (r *Runtime) getHeap(heapAddr int) (Immediate, error) {
 }
 
 func (r *Runtime) readHeapBytes(addr, length int) ([]byte, error) {
-	if addr < 0 || length < 0 || addr+length > len(r.heap) {
-		return nil, fmt.Errorf("readHeapBytes: out of bounds")
+	if addr < 0 || length < 0 {
+		return nil, fmt.Errorf("readHeapBytes: invalid args")
 	}
-	buf := make([]byte, length)
-	for i := 0; i < length; i++ {
+	buf := make([]byte, 0, length)
+	for i := range length {
 		cell, err := r.getHeap(addr + i)
 		if err != nil {
 			return nil, err
 		}
+		// nil は 0 とみなす
+		var b byte
 		if cell == nil {
-			buf[i] = 0
-			continue
+			b = 0
+		} else {
+			b = byte(rune(cell.Value()))
 		}
-		buf[i] = byte(rune(cell.Value()))
+		// ヌル終端で停止
+		if b == 0 {
+			break
+		}
+		buf = append(buf, b)
 	}
 	return buf, nil
 }
+
 func (r *Runtime) writeHeapBytes(addr int, data []byte) error {
-	if addr < 0 || addr+len(data) > len(r.heap) {
-		return fmt.Errorf("writeHeapBytes: out of bounds")
+	if addr < 0 {
+		return fmt.Errorf("writeHeapBytes: invalid addr")
 	}
 	for i, b := range data {
+		// ヌル終端で停止
+		if b == 0 {
+			break
+		}
 		if err := r.setHeap(addr+i, Character(int(b))); err != nil {
 			return err
 		}
