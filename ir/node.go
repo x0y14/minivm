@@ -183,6 +183,9 @@ type Character rune
 
 func (c Character) isNode() {}
 func (c Character) String() string {
+	if c == 0 {
+		return "'\\0'"
+	}
 	return strconv.QuoteRune(rune(c))
 }
 
@@ -371,6 +374,9 @@ type ConstChar rune
 
 func (c ConstChar) isData() {}
 func (c ConstChar) String() string {
+	if c == 0 {
+		return "\\0"
+	}
 	return string(c)
 }
 
@@ -422,6 +428,7 @@ func parseArray() ([]ConstantData, error) {
 		for _, r := range str.Raw {
 			arr = append(arr, ConstChar(r))
 		}
+		arr = append(arr, ConstChar('\000'))
 		return arr, nil
 	}
 

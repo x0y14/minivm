@@ -42,6 +42,9 @@ type Character rune
 
 func (c Character) isCode() {}
 func (c Character) String() string {
+	if c == 0 {
+		return "'\\0'"
+	}
 	return strconv.QuoteRune(rune(c))
 }
 func (c Character) isOperand()   {}

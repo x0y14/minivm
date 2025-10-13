@@ -189,6 +189,8 @@ func char() (*Token, error) {
 			r = '\\'
 		case '\'':
 			r = '\''
+		case '0':
+			r = 0
 		default:
 			return nil, fmt.Errorf("unsupported escape: \\%c", text[loc.at])
 		}
