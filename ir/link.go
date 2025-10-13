@@ -8,16 +8,8 @@ import (
 func merge(dst, src *IR) (*IR, error) {
 	mergedImports := dst.Imports
 	var mergedText = dst.Text
-	geta := len(mergedText)
 	for _, nd := range src.Text {
 		switch nd := nd.(type) {
-		case Offset:
-			switch nd.Target { // PCの時だけdstのNODE分下駄を履かせる
-			case PC:
-				mergedText = append(mergedText, Offset{PC, nd.Diff + geta})
-			default:
-				mergedText = append(mergedText, nd)
-			}
 		case Label:
 			if nd.Define {
 				// mergedImportsから消す
