@@ -31,3 +31,4 @@ _mul_done:
 ; ライブラリ共通の戻りプレースホルダ
 _lib_ret:
     ; return placeholder
+    ret

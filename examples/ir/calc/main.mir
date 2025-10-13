@@ -1,6 +1,7 @@
-.import add
-.import sub
-.import mul
+.import _add
+.import _sub
+.import _mul
+.import _println_int
 
 .section .text:
     global _start
@@ -10,19 +11,20 @@ _start:
     ; add(1,2)
     mov r1 1
     mov r2 2
-    jmp _add
+    call _add
 _after_add:
     mov r3 r0       ; add の結果を一時保存 (r3)
 
     ; sub(4,3)
     mov r1 4
     mov r2 3
-    jmp _sub
+    call _sub
 _after_sub:
     mov r2 r0       ; sub の結果を r2 (mul の第2引数)
     mov r1 r3       ; add の結果を r1 (mul の第1引数)
-    jmp _mul
+    call _mul
 _after_mul:
     mov r1 r0       ; 計算結果をr1へ
+    call _println_int
     mov r0 0        ; sys_exit
     syscall

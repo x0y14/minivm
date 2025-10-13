@@ -1,0 +1,91 @@
+.export _print
+.export _println
+.export _print_int
+.export _println_int
+
+.section .data:
+    newline auto '\n'
+    newlineLen sizeof newline
+
+.section .text:
+
+__print_newline:
+    mov r0 1      ; SYS_WRITE
+    mov r1 1      ; stdout
+    mov r2 newline
+    mov r3 newlineLen
+    syscall
+    ret
+
+; print(heapAddr, length)
+_print:
+    mov r3 r2     ; length
+    mov r2 r1     ; heapAddr
+    mov r0 1      ; SYS_WRITE
+    mov r1 1      ; stdout
+    syscall
+    ret
+
+; println(heapAddr, length)
+_println:
+    call _print
+    call __print_newline
+    ret
+
+; print_int(n)  ; r1=n (>=0)
+_print_int:
+    push r1               ; preserve n
+
+    mov r5 r1
+    eq r5 0
+    jz _print_zero        ; n == 0 の特別扱い
+
+    alloc 32              ; 十分な作業バッファ
+    pop r4                ; r4 = base
+    mov r7 r4
+    add r7 31             ; r7 = 書き込み位置（末尾から）
+    mov r6 0              ; r6 = 桁数
+_print_int_next_digit:
+    ; r5 を 10 で割って (q,r) を得る（繰り返し減算）
+    mov r8 0              ; q
+    mov r9 r5             ; r = n
+_div_loop:
+    lt r9 10              ; ZF=(r<10)
+    jz _div_done          ; r<10 なら終了
+    sub r9 10
+    add r8 1
+    jmp _div_loop
+_div_done:
+    add r9 48             ; '0' を足して文字化
+    store r7 r9           ; 1 文字書き込み
+    sub r7 1
+    add r6 1
+    mov r5 r8             ; n = q
+    eq r5 0
+    jnz _print_int_next_digit  ; n!=0 なら続行
+
+    ; 出力（先頭は r7+1、長さは r6）
+    mov r1 r7
+    add r1 1
+    mov r2 r6
+    call _print
+
+    pop r1
+    ret
+
+_print_zero:
+    alloc 1
+    pop r4
+    mov r5 48             ; '0'
+    store r4 r5
+    mov r1 r4
+    mov r2 1
+    call _print
+    pop r1
+    ret
+
+; println_int(n)
+_println_int:
+    call _print_int
+    call __print_newline
+    ret
