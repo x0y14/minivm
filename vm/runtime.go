@@ -442,6 +442,11 @@ func (r *Runtime) exec() error {
 				return r.setReg(dst.(Register), v)
 			case Offset:
 				return r.setStack(dst.(Offset), v)
+			case Immediate:
+				if _, ok := dst.(Integer); !ok {
+					return fmt.Errorf("load: unsupported src: %s", src.String())
+				}
+				return r.setHeap(int(dst.(Integer)), v)
 			default:
 				return fmt.Errorf("load: unsupported dst: %s", dst.String())
 			}
