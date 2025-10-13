@@ -936,3 +936,10 @@ func (r *Runtime) Run() error {
 		}
 	}
 }
+func (r *Runtime) Status() int {
+	imm, err := r.getReg(R1)
+	if err != nil {
+		return 1
+	}
+	return imm.Value()
+}

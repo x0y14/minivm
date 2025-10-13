@@ -36,6 +36,7 @@ func readIr(path string) (string, error) {
 }
 
 func main() {
+	var status int
 	var stackSize uint
 	var heapSize uint
 	var link bool
@@ -170,7 +171,12 @@ func main() {
 						StackSize: int(stackSize),
 						HeapSize:  int(heapSize),
 					})
-					return rt.Run()
+					err = rt.Run()
+					if err != nil {
+						return err
+					}
+					status = rt.Status()
+					return nil
 				},
 			},
 		},
@@ -179,4 +185,6 @@ func main() {
 	if err := cmd.Run(context.Background(), os.Args); err != nil {
 		log.Fatal(err)
 	}
+
+	os.Exit(status)
 }
