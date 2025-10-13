@@ -88,7 +88,7 @@ print_fizzbuzz:
 after_print:
     ; --- increment number buffer stored in heap as num2 (ones), num1 (tens), num0 (hundreds) ---
     ; load num2 -> r1, add 1, if overflow ('9'+1 => 58) carry else store back
-    load num2 r1
+    load r1 num2
     add r1 1
     eq r1 58
     jz carry_ones
@@ -98,7 +98,7 @@ carry_ones:
     mov r1 48        ; '0'
     store num2 r1
     ; carry to tens
-    load num1 r1
+    load r1 num1
     add r1 1
     eq r1 58
     jz carry_tens
@@ -108,7 +108,7 @@ carry_tens:
     mov r1 48
     store num1 r1
     ; carry to hundreds (no wrap for 100)
-    load num0 r1
+    load r1 num0
     add r1 1
     store num0 r1
 
