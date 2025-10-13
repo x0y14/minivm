@@ -1,115 +1,130 @@
-; ヒープに文字保存用領域を用意
-alloc 16        ; bufbase = 0
-pop r10         ; r10 = bufbase(=0)
-mov r6 1        ; i =1
-
-; loop_start:
-mov r5 0        ; printed = 0
-
-; i % 3
-mov r7 r6       ; tmp = i
-mov r8 3        ; d = 3
-; mod3_loop:
-lt r7 r8        ; if tmp < d then break
-jz (+7)         ;   -> after_mod3
-sub r7 r8       ; tmp -= d
-jmp (-8)        ;   -> mod3_loop
-; after_mod3:
-eq r7 0         ; tmp == 0?
-jz (+4)         ;   -> print_fizz
-jmp (+30)       ;   -> after_fizz
-
-; print_fizz:
-store r10 'F'
-store 1 'i'
-store 2 'z'
-store 3 'z'
-mov r0 1        ; sys_write
-mov r1 1        ; fd = 1
-mov r2 r10      ; addr = buf
-mov r3 4        ; len = 4
+jmp (+214)
+nop
+mov r5 1
+mov r7 0
+mov r8 0
+nop
+add r7 1
+eq r7 3
+jz (+7)
+mov r9 0
+jmp (+9)
+nop
+mov r7 0
+mov r9 1
+nop
+add r8 1
+eq r8 5
+jz (+7)
+mov r10 0
+jmp (+9)
+nop
+mov r8 0
+mov r10 1
+nop
+mov r4 r9
+add r4 r10
+eq r4 2
+jz (+61)
+eq r4 1
+jz (+18)
+nop
+mov r1 1
+mov r2 0
+mov r3 4
+mov r0 1
 syscall
-mov r5 1        ; printed = 1
-
-; after_fizz:
-; i % 5
-mov r7 r6       ; tmp = i
-mov r8 5        ; d = 5
-; mod5_lop:
-lt r7 r8
-jz (+7)         ;   -> after_mod5
-sub r7 r8
-jmp (-8)        ;   -> mod5_loop
-; after_mod5:
-eq r7 0
-jz (+4)         ;   -> print_buzz
-jmp (+30)       ;   -> after_buzz
-
-; print_buzz:
-store r10 'B'
-store 1 'u'
-store 2 'z'
-store 3 'z'
-mov r0 1        ; sys_write
-mov r1 1        ; fd = 1
-mov r2 r10      ; addr = buf
-mov r3 4        ; len = 4
+jmp (+54)
+nop
+eq r9 1
+jz (+18)
+nop
+mov r1 1
+mov r2 9
+mov r3 5
+mov r0 1
 syscall
-mov r5 1        ; printed = 1
-
-; after_buzz:
-; printed == 0 なら数字を出力
-eq r5 0
-jz (+4)         ;   -> print_number
-jmp (+78)       ;   -> after_number
-
-; print_number:
-lt r6 10
-jz (+51)        ;   -> one_digit
-
-; two_digit (10..15): '1'と下位桁
-mov r3 '1'
-store r10 r3
-mov r0 1        ; sys_write
-mov r1 1        ; fd = 1
-mov r2 r10      ; addr = buf
-mov r3 1        ; len = 1
+jmp (+32)
+nop
+mov r1 1
+mov r2 4
+mov r3 5
+mov r0 1
 syscall
-
-mov r3 r6       ; 下位桁 = i -10 + '0'
-sub r3 10
-add r3 '0'
-store 1 r3
-mov r0 1        ; sys_write
-mov r1 1        ; fd = 1
-mov r2 r10      ; addr = buf
-add r2 1        ; addr += 1
-mov r3 1        ; len = 1
+jmp (+16)
+nop
+mov r1 1
+mov r2 14
+mov r3 9
+mov r0 1
 syscall
-jmp (+24)       ;   -> after_number
-
-; one_digit:
-mov r3 '0'
-add r3 r6       ; '0' + i
-store r10 r3
-mov r0 1        ; sys_write
-mov r1 1        ; fd = 1
-mov r2 r10      ; addr = buf
-mov r3 1        ; len = 1
+nop
+load r1 2
+add r1 1
+eq r1 58
+jz (+7)
+store 2 r1
+jmp (+41)
+nop
+mov r1 48
+store 2 r1
+load r1 1
+add r1 1
+eq r1 58
+jz (+7)
+store 1 r1
+jmp (+18)
+nop
+mov r1 48
+store 1 r1
+load r1 0
+add r1 1
+store 0 r1
+nop
+add r5 1
+eq r5 101
+jz (+4)
+jmp (-192)
+nop
+mov r1 0
+mov r0 0
 syscall
-
-; after_number:
-; 改行
-store r10 '\n'
-mov r0 1        ; sys_write
-mov r1 1        ; fd = 1
-mov r2 r10      ; addr = buf
-mov r3 1        ; len = 1
-syscall
-
-; i++
-add r6 1
-le r6 15        ; i <= 15?
-jz (-210)       ;   -> loop_start
-mov r0 0        ; sys_exit
-syscall
+nop
+alloc 1
+pop r10
+store 0 '0'
+alloc 1
+pop r10
+store 1 '0'
+alloc 1
+pop r10
+store 2 '1'
+alloc 1
+pop r10
+store 3 '\n'
+alloc 5
+pop r10
+store 4 'F'
+store 5 'i'
+store 6 'z'
+store 7 'z'
+store 8 '\n'
+alloc 5
+pop r10
+store 9 'B'
+store 10 'u'
+store 11 'z'
+store 12 'z'
+store 13 '\n'
+alloc 9
+pop r10
+store 14 'F'
+store 15 'i'
+store 16 'z'
+store 17 'z'
+store 18 'B'
+store 19 'u'
+store 20 'z'
+store 21 'z'
+store 22 '\n'
+jmp (-310)
