@@ -4,10 +4,23 @@
 .export _println_int
 
 .section .data:
-    newline auto '\n'
+    newline auto '\n', '\0'
     newlineLen sizeof newline
 
 .section .text:
+
+; r1=heapBaseAddr -> r2=len (until '\0')
+__strlen:
+    mov r2 0
+__strlen_loop:
+    load r3 r1
+    eq r3 0
+    jz __strlen_done
+    add r1 1
+    add r2 1
+    jmp __strlen_loop
+__strlen_done:
+    ret
 
 __print_newline:
     mov r0 1      ; SYS_WRITE
@@ -33,6 +46,9 @@ _println:
     ret
 
 ; print_int(n)  ; r1=n (>=0)
+; 1) 桁数だけ先に数える -> len
+; 2) len+1 を確保し（終端 '\0' 分）、末尾から文字を書き込む
+; 3) 末尾に '\0' を置き、__strlen で長さを測って _print
 _print_int:
     push r1               ; preserve n
 
@@ -40,46 +56,81 @@ _print_int:
     eq r5 0
     jz _print_zero        ; n == 0 の特別扱い
 
-    alloc 32              ; 十分な作業バッファ
-    pop r4                ; r4 = base
-    mov r7 r4
-    add r7 31             ; r7 = 書き込み位置（末尾から）
+    ; --- pass1: 桁数カウント ---
     mov r6 0              ; r6 = 桁数
-_print_int_next_digit:
-    ; r5 を 10 で割って (q,r) を得る（繰り返し減算）
+_print_int_count_loop:
     mov r8 0              ; q
     mov r9 r5             ; r = n
-_div_loop:
-    lt r9 10              ; ZF=(r<10)
-    jz _div_done          ; r<10 なら終了
+_print_int_div1:
+    lt r9 10
+    jz _print_int_div1_done
     sub r9 10
     add r8 1
-    jmp _div_loop
-_div_done:
-    add r9 48             ; '0' を足して文字化
-    store r7 r9           ; 1 文字書き込み
-    sub r7 1
-    add r6 1
+    jmp _print_int_div1
+_print_int_div1_done:
+    add r6 1              ; 1 桁確定
     mov r5 r8             ; n = q
     eq r5 0
-    jnz _print_int_next_digit  ; n!=0 なら続行
+    jnz _print_int_count_loop
 
-    ; 出力（先頭は r7+1、長さは r6）
-    mov r1 r7
-    add r1 1
-    mov r2 r6
-    call _print
+    ; len+1 を確保（終端用に +1）
+    mov r3 r6
+    add r3 1
+    alloc r3
+    pop r4                ; r4 = heap base
+    pop r10               ; r10 = original n（呼び出し元保存用）
+    ; 書き込み開始位置（末尾から）
+    mov r7 r4
+    add r7 r6
+    sub r7 1
 
-    pop r1
+    ; --- pass2: 文字列生成（末尾から書く） ---
+    mov r5 r10            ; n = original n
+_print_int_write_loop:
+    mov r8 0              ; q
+    mov r9 r5             ; r = n
+_print_int_div2:
+    lt r9 10
+    jz _print_int_div2_done
+    sub r9 10
+    add r8 1
+    jmp _print_int_div2
+_print_int_div2_done:
+    add r9 48             ; '0'
+    store r7 r9
+    sub r7 1
+    mov r5 r8             ; n = q
+    eq r5 0
+    jnz _print_int_write_loop
+
+    ; 末尾に '\0'
+    mov r3 0
+    mov r2 r4
+    add r2 r6
+    store r2 r3
+
+    ; 長さ測定 -> _print
+    mov r1 r4
+    call __strlen         ; r1 は走査で進むので注意
+    mov r1 r4             ; base を戻す
+    call _print           ; r1=base, r2=len
+
+    mov r1 r10            ; 呼び出し元 r1 を復元
     ret
 
 _print_zero:
-    alloc 1
+    ; "0\0" を作って __strlen -> _print
+    alloc 2
     pop r4
     mov r5 48             ; '0'
     store r4 r5
+    mov r5 0              ; '\0'
+    mov r2 r4
+    add r2 1
+    store r2 r5
     mov r1 r4
-    mov r2 1
+    call __strlen         ; r2=1
+    mov r1 r4
     call _print
     pop r1
     ret
